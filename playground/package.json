@@ -33,6 +33,6 @@
     "socket.io-client": "^4.8.3",
     "swr": "^2.4.1",
     "tailwindcss": "^4.2.1",
-    "vite": "^7.2.2"
+    "vite": "^8.0.0"
   }
 }
