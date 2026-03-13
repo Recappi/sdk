@@ -34,7 +34,7 @@
     ]
   },
   "engines": {
-    "node": ">= 10"
+    "node": ">= 20.19.0"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
@@ -65,18 +65,18 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.4.1",
-    "@oxc-node/core": "^0.0.34",
+    "@napi-rs/cli": "^3.5.1",
+    "@oxc-node/core": "^0.0.35",
     "@taplo/cli": "^0.7.0",
-    "@types/node": "^24.10.1",
-    "ava": "^6.4.1",
+    "@types/node": "^25.5.0",
+    "ava": "^7.0.0",
     "husky": "^9.1.7",
-    "lint-staged": "^16.2.6",
+    "lint-staged": "^16.3.3",
     "npm-run-all2": "^8.0.4",
-    "oxfmt": "^0.13.0",
-    "oxlint": "^1.28.0",
-    "prettier": "^3.6.2",
-    "tinybench": "^5.1.0",
+    "oxfmt": "^0.40.0",
+    "oxlint": "^1.55.0",
+    "prettier": "^3.8.1",
+    "tinybench": "^6.0.0",
     "typescript": "^5.9.3"
   },
   "lint-staged": {
