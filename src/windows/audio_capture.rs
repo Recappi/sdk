@@ -8,6 +8,7 @@ use std::{
   thread::JoinHandle,
 };
 
+use audioadapter_buffers::direct::SequentialSliceOfVecs;
 use cpal::{
   SampleRate,
   traits::{DeviceTrait, HostTrait, StreamTrait},
@@ -19,13 +20,13 @@ use napi::{
   threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode},
 };
 use napi_derive::napi;
-use rubato::{FastFixedIn, PolynomialDegree, Resampler};
+use rubato::{Async, FixedAsync, PolynomialDegree, Resampler};
 
 const RESAMPLER_INPUT_CHUNK: usize = 1024; // samples per channel
 const TARGET_FRAME_SIZE: usize = 1024; // frame size returned to JS (in mono samples)
 
 struct BufferedResampler {
-  resampler: FastFixedIn<f32>,
+  resampler: Async<f32>,
   channels: usize,
   fifo: Vec<Vec<f32>>,            // per-channel queue
   initial_output_discarded: bool, // Flag to discard first output block (warm-up)
@@ -34,14 +35,15 @@ struct BufferedResampler {
 impl BufferedResampler {
   fn new(from_sr: f64, to_sr: f64, channels: usize) -> Self {
     let ratio = to_sr / from_sr;
-    let resampler = FastFixedIn::<f32>::new(
+    let resampler = Async::<f32>::new_poly(
       ratio,
       1.0,                      // max_resample_ratio_relative (>= 1.0, fixed ratio)
       PolynomialDegree::Linear, // balance quality/perf
       RESAMPLER_INPUT_CHUNK,
       channels,
+      FixedAsync::Input,
     )
-    .expect("Failed to create FastFixedIn resampler");
+    .expect("Failed to create Async poly resampler");
 
     Self {
       resampler,
@@ -70,7 +72,18 @@ impl BufferedResampler {
         chunk.push(tail);
       }
 
-      if let Ok(out_blocks) = self.resampler.process(&chunk, None) {
+      if let Ok(out_blocks) = {
+        let output_frames = self.resampler.output_frames_next();
+        let input_adapter =
+          SequentialSliceOfVecs::new(&chunk, self.channels, RESAMPLER_INPUT_CHUNK).unwrap();
+        let mut out_data = vec![vec![0.0f32; output_frames]; self.channels];
+        let mut output_adapter =
+          SequentialSliceOfVecs::new_mut(&mut out_data, self.channels, output_frames).unwrap();
+        self
+          .resampler
+          .process_into_buffer(&input_adapter, &mut output_adapter, None)
+          .map(|_| out_data)
+      } {
         if !out_blocks.is_empty() && out_blocks.len() == self.channels {
           if !self.initial_output_discarded {
             self.initial_output_discarded = true;

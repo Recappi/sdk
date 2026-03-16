@@ -1,11 +1,12 @@
 use std::{io::Cursor, path::Path};
 
+use audioadapter_buffers::direct::SequentialSliceOfVecs;
 use napi::{
   Task,
   bindgen_prelude::{AbortSignal, AsyncTask, Float32Array, Result, Status, Uint8Array},
 };
 use napi_derive::napi;
-use rubato::{Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType};
+use rubato::{Async, FixedAsync, Resampler, SincInterpolationParameters, SincInterpolationType};
 use symphonia::core::{
   audio::{AudioBuffer, Signal},
   codecs::DecoderOptions,
@@ -84,7 +85,6 @@ fn decode<B: AsRef<[u8]> + Send + Sync + 'static>(
   };
 
   if sample_rate != dest_sample_rate {
-    // Calculate parameters for resampling
     let params = SincInterpolationParameters {
       sinc_len: 256,
       f_cutoff: 0.95,
@@ -93,18 +93,26 @@ fn decode<B: AsRef<[u8]> + Send + Sync + 'static>(
       window: rubato::WindowFunction::BlackmanHarris2,
     };
 
-    let mut resampler = SincFixedIn::<f32>::new(
+    let num_frames = output.len();
+    let mut resampler = Async::<f32>::new_sinc(
       dest_sample_rate as f64 / sample_rate as f64,
       2.0,
-      params,
-      output.len(),
+      &params,
+      num_frames,
       1,
+      FixedAsync::Input,
     )
     .map_err(|_| Error::Unsupported("Failed to create resampler"))?;
 
     let waves_in = vec![output];
-    let mut waves_out = resampler
-      .process(&waves_in, None)
+    let output_frames = resampler.output_frames_next();
+    let input_adapter = SequentialSliceOfVecs::new(&waves_in, 1, num_frames)
+      .map_err(|_| Error::Unsupported("Failed to create input adapter"))?;
+    let mut waves_out = vec![vec![0.0f32; output_frames]];
+    let mut output_adapter = SequentialSliceOfVecs::new_mut(&mut waves_out, 1, output_frames)
+      .map_err(|_| Error::Unsupported("Failed to create output adapter"))?;
+    resampler
+      .process_into_buffer(&input_adapter, &mut output_adapter, None)
       .map_err(|_| Error::Unsupported("Failed to run resampler"))?;
     output = waves_out
       .pop()

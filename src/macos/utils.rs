@@ -1,11 +1,12 @@
 use std::{cell::RefCell, collections::HashMap, ffi::c_void, mem::size_of};
 
+use audioadapter_buffers::direct::SequentialSliceOfVecs;
 use core_foundation::string::CFString;
 use coreaudio::sys::{
   AudioObjectGetPropertyData, AudioObjectID, AudioObjectPropertyAddress,
   kAudioObjectPropertyElementMain, kAudioObjectPropertyScopeGlobal,
 };
-use rubato::{FastFixedIn, PolynomialDegree, Resampler};
+use rubato::{Async, FixedAsync, PolynomialDegree, Resampler};
 
 use crate::error::CoreAudioError;
 
@@ -18,7 +19,7 @@ use crate::error::CoreAudioError;
 const RESAMPLER_INPUT_CHUNK: usize = 1024; // samples per channel
 
 struct BufferedResampler {
-  resampler: FastFixedIn<f32>,
+  resampler: Async<f32>,
   channels: usize,
   fifo: Vec<Vec<f32>>,            // per-channel queue
   initial_output_discarded: bool, // Flag to track if the first output has been discarded
@@ -27,14 +28,15 @@ struct BufferedResampler {
 impl BufferedResampler {
   fn new(from_sr: f64, to_sr: f64, channels: usize) -> Self {
     let ratio = to_sr / from_sr;
-    let resampler = FastFixedIn::<f32>::new(
+    let resampler = Async::<f32>::new_poly(
       ratio,
       1.0, // max_resample_ratio_relative (must be >= 1.0, use 1.0 for fixed ratio)
       PolynomialDegree::Linear, // Use Linear interpolation quality
       RESAMPLER_INPUT_CHUNK,
       channels,
+      FixedAsync::Input,
     )
-    .expect("Failed to create FastFixedIn resampler (5-arg attempt)");
+    .expect("Failed to create Async poly resampler");
 
     BufferedResampler {
       resampler,
@@ -64,7 +66,18 @@ impl BufferedResampler {
         chunk.push(tail);
       }
 
-      if let Ok(out_blocks) = self.resampler.process(&chunk, None) {
+      if let Ok(out_blocks) = {
+        let output_frames = self.resampler.output_frames_next();
+        let input_adapter =
+          SequentialSliceOfVecs::new(&chunk, self.channels, RESAMPLER_INPUT_CHUNK).unwrap();
+        let mut out_data = vec![vec![0.0f32; output_frames]; self.channels];
+        let mut output_adapter =
+          SequentialSliceOfVecs::new_mut(&mut out_data, self.channels, output_frames).unwrap();
+        self
+          .resampler
+          .process_into_buffer(&input_adapter, &mut output_adapter, None)
+          .map(|_| out_data)
+      } {
         // out_blocks is Vec<Vec<f32>> planar
         if !out_blocks.is_empty() && out_blocks.len() == self.channels {
           // Check if we should discard the initial output
