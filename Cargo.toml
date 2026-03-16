@@ -13,7 +13,7 @@ crate-type = ["cdylib"]
 [dependencies]
 napi        = "3.0.0"
 napi-derive = "3.0.0"
-rubato      = "0.16"
+rubato      = "1.0"
 symphonia   = { version = "0.5", features = ["all", "opt-simd"] }
 thiserror   = "2"
 
