@@ -1,10 +1,10 @@
 {
   "name": "playground",
+  "version": "0.0.0",
   "private": true,
   "type": "module",
-  "version": "0.0.0",
   "scripts": {
-    "dev:web": "vite",
+    "dev:web": "vp dev",
     "dev:server": "oxnode --env-file=.env --watch server/main.ts"
   },
   "devDependencies": {
@@ -33,6 +33,7 @@
     "socket.io-client": "^4.8.3",
     "swr": "^2.4.1",
     "tailwindcss": "^4.2.1",
-    "vite": "^8.0.0"
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
   }
 }

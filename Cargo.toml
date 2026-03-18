@@ -1,7 +1,7 @@
 [package]
 authors = ["LongYinan <lynweklm@gmail.com>"]
 edition = "2024"
-name    = "recording"
+name = "recording"
 version = "0.0.0"
 publish = false
 
@@ -12,25 +12,25 @@ crate-type = ["cdylib"]
 
 [dependencies]
 audioadapter-buffers = "2.0"
-napi                 = "3.0.0"
-napi-derive          = "3.0.0"
-rubato               = "1.0"
-symphonia            = { version = "0.5", features = ["all", "opt-simd"] }
-thiserror            = "2"
+napi = "3.0.0"
+napi-derive = "3.0.0"
+rubato = "1.0"
+symphonia = { version = "0.5", features = ["all", "opt-simd"] }
+thiserror = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-block2                 = "0.6"
-core-foundation        = { version = "0.10", features = ["with-uuid"] }
-coreaudio-rs           = "0.12"
-dispatch2              = "0.3"
-libc                   = "0.2"
-objc2                  = "0.6"
-objc2-core-audio       = "0.3"
+block2 = "0.6"
+core-foundation = { version = "0.10", features = ["with-uuid"] }
+coreaudio-rs = "0.12"
+dispatch2 = "0.3"
+libc = "0.2"
+objc2 = "0.6"
+objc2-core-audio = "0.3"
 objc2-core-audio-types = "0.3"
-objc2-core-foundation  = "0.3"
-objc2-foundation       = "0.3"
-screencapturekit       = "0.3"
-uuid                   = { version = "1", features = ["v4"] }
+objc2-core-foundation = "0.3"
+objc2-foundation = "0.3"
+screencapturekit = "0.3"
+uuid = { version = "1", features = ["v4"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 cpal = "0.16"
@@ -53,5 +53,5 @@ windows-core = { version = "0.62" }
 napi-build = "2"
 
 [profile.release]
-lto   = true
+lto = true
 strip = "symbols"
