@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use coreaudio::sys::{AudioObjectID, kAudioTapPropertyFormat};
+use coreaudio_sys::{AudioObjectID, kAudioTapPropertyFormat};
 use objc2::{Encode, Encoding, RefEncode};
 
 use crate::{error::CoreAudioError, utils::get_global_main_property};

@@ -1,6 +1,6 @@
 use std::{mem::MaybeUninit, ptr};
 
-use coreaudio::sys::{
+use coreaudio_sys::{
   AudioObjectGetPropertyData, AudioObjectGetPropertyDataSize, AudioObjectID,
   AudioObjectPropertyAddress, AudioObjectPropertySelector, kAudioHardwareNoError,
   kAudioHardwarePropertyProcessObjectList, kAudioObjectPropertyElementMain,

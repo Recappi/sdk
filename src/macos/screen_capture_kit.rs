@@ -13,7 +13,7 @@ use core_foundation::{
   base::TCFType,
   string::{CFString, CFStringRef},
 };
-use coreaudio::sys::{
+use coreaudio_sys::{
   AudioObjectAddPropertyListenerBlock, AudioObjectID, AudioObjectPropertyAddress,
   AudioObjectRemovePropertyListenerBlock, kAudioHardwarePropertyProcessObjectList,
   kAudioObjectPropertyElementMain, kAudioObjectPropertyScopeGlobal, kAudioObjectSystemObject,

@@ -2,7 +2,7 @@ use core_foundation::{
   base::{FromVoid, ItemRef},
   string::CFString,
 };
-use coreaudio::sys::AudioObjectID;
+use coreaudio_sys::AudioObjectID;
 use objc2::{
   AllocAnyThread, msg_send,
   runtime::{AnyClass, AnyObject},
