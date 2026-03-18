@@ -8,7 +8,7 @@
 
 Both input and output devices are recording, mixed into a single audio stream.
 
-```ts
+```typescript
 import { writeFile } from 'node:fs/promises'
 import { setTimeout } from 'node:timers/promises'
 
@@ -64,7 +64,7 @@ await writeFile('output.wav', wavBuffer)
 
 ### Listing running applications
 
-```ts
+```typescript
 import { ShareableContent } from '@recappi/sdk'
 
 const apps = ShareableContent.applications()
@@ -76,7 +76,7 @@ for (const app of apps) {
 
 ### Recording specific application
 
-```ts
+```typescript
 import { ShareableContent } from '@recappi/sdk'
 
 const apps = ShareableContent.applications()
