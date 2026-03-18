@@ -1,6 +1,6 @@
 # `@recappi/sdk`
 
-![https://github.com/Recappi/sdk/actions/workflows/CI.yml](https://github.com/recappi/sdk/workflows/CI/badge.svg)
+[![CI](https://github.com/Recappi/sdk/actions/workflows/CI.yml/badge.svg)](https://github.com/Recappi/sdk/actions/workflows/CI.yml)
 
 ## Usage
 
@@ -62,6 +62,45 @@ const wavBuffer = Buffer.from(
 );
 
 await writeFile("output.wav", wavBuffer);
+```
+
+### Listing running applications
+
+```ts
+import { ShareableContent } from "@recappi/sdk";
+
+const apps = ShareableContent.applications();
+
+for (const app of apps) {
+  console.log(`Name: ${app.name}, PID: ${app.processId}`);
+}
+```
+
+### Recording specific application
+
+```ts
+import { ShareableContent } from "@recappi/sdk";
+
+const apps = ShareableContent.applications();
+const musicApp = apps.find((app) => app.name === "Music");
+
+if (musicApp) {
+  const session = ShareableContent.tapAudio(
+    musicApp.processId,
+    (err, samples) => {
+      if (err) {
+        console.error("Error capturing audio:", err);
+        return;
+      }
+      // Process samples...
+    },
+  );
+
+  // Stop recording after 5 seconds
+  setTimeout(() => {
+    session.stop();
+  }, 5000);
+}
 ```
 
 ## Playground
