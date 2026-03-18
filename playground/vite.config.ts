@@ -1,18 +1,18 @@
-import tailwindcss from "@tailwindcss/vite";
-import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import tailwindcss from '@tailwindcss/vite'
+import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite-plus'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  root: "./web",
+  root: './web',
   server: {
     proxy: {
-      "/api": {
-        target: "http://localhost:6544",
+      '/api': {
+        target: 'http://localhost:6544',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ""),
+        rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
   },
-});
+})

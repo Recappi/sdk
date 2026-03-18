@@ -2,7 +2,4 @@
 rustflags = ["-C", "target-feature=+crt-static"]
 
 [target.'cfg(target_os = "macos")']
-rustflags = [
-  "-C",
-  "link-args=-weak_framework ScreenCaptureKit",
-]
+rustflags = ["-C", "link-args=-weak_framework ScreenCaptureKit"]

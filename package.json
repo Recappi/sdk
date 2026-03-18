@@ -2,9 +2,12 @@
   "name": "@recappi/sdk",
   "version": "1.0.0",
   "description": "Cross platform audio capture SDK",
-  "main": "index.cjs",
-  "types": "./index.d.cts",
-  "type": "module",
+  "keywords": [
+    "audio",
+    "napi-rs",
+    "recording"
+  ],
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/Recappi/sdk.git"
@@ -12,17 +15,58 @@
   "workspaces": [
     "./playground"
   ],
-  "license": "MIT",
-  "keywords": [
-    "napi-rs",
-    "audio",
-    "recording"
-  ],
   "files": [
     "index.d.ts",
     "index.js",
     "./dist/**/*"
   ],
+  "type": "module",
+  "main": "index.cjs",
+  "types": "./index.d.cts",
+  "exports": {
+    ".": "./index.cjs",
+    "./encode-wav": {
+      "default": "./dist/encode-wav.js",
+      "types": "./dist/encode-wav.d.ts"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "artifacts": "napi artifacts",
+    "bench": "node --import @oxc-node/core/register benchmark/bench.ts",
+    "build": "napi build --platform --release --js index.cjs --dts index.d.cts",
+    "build:debug": "napi build --platform --js index.cjs --dts index.d.cts",
+    "build:ts": "tsc",
+    "format": "run-p format:js format:rs format:toml",
+    "format:js": "vp fmt .",
+    "format:toml": "taplo format",
+    "format:rs": "cargo fmt",
+    "lint": "vp lint .",
+    "prepublishOnly": "napi prepublish -t npm",
+    "test": "ava",
+    "preversion": "napi build --platform && git add .",
+    "version": "napi version",
+    "prepare": "vp config"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.5.1",
+    "@oxc-node/core": "^0.0.35",
+    "@types/node": "^25.5.0",
+    "ava": "^7.0.0",
+    "npm-run-all2": "^8.0.4",
+    "oxlint-tsgolint": "^0.17.0",
+    "prettier": "^3.8.1",
+    "tinybench": "^6.0.0",
+    "typescript": "^5.9.3",
+    "vite-plus": "catalog:"
+  },
+  "resolutions": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@latest",
+    "vitest": "npm:@voidzero-dev/vite-plus-test@latest"
+  },
   "napi": {
     "binaryName": "recording",
     "targets": [
@@ -33,77 +77,22 @@
       "aarch64-pc-windows-msvc"
     ]
   },
-  "engines": {
-    "node": ">= 20.19.0"
-  },
-  "publishConfig": {
-    "registry": "https://registry.npmjs.org/",
-    "access": "public"
-  },
-  "exports": {
-    ".": "./index.cjs",
-    "./encode-wav": {
-      "default": "./dist/encode-wav.js",
-      "types": "./dist/encode-wav.d.ts"
-    }
-  },
-  "scripts": {
-    "artifacts": "napi artifacts",
-    "bench": "node --import @oxc-node/core/register benchmark/bench.ts",
-    "build": "napi build --platform --release --js index.cjs --dts index.d.cts",
-    "build:debug": "napi build --platform --js index.cjs --dts index.d.cts",
-    "build:ts": "tsc",
-    "format": "run-p format:js format:rs format:toml",
-    "format:js": "oxfmt .",
-    "format:toml": "taplo format",
-    "format:rs": "cargo fmt",
-    "lint": "oxlint .",
-    "prepublishOnly": "napi prepublish -t npm",
-    "test": "ava",
-    "preversion": "napi build --platform && git add .",
-    "version": "napi version",
-    "prepare": "husky"
-  },
-  "devDependencies": {
-    "@napi-rs/cli": "^3.5.1",
-    "@oxc-node/core": "^0.0.35",
-    "@taplo/cli": "^0.7.0",
-    "@types/node": "^25.5.0",
-    "ava": "^7.0.0",
-    "husky": "^9.1.7",
-    "lint-staged": "^16.3.3",
-    "npm-run-all2": "^8.0.4",
-    "oxfmt": "^0.40.0",
-    "oxlint": "^1.55.0",
-    "prettier": "^3.8.1",
-    "tinybench": "^6.0.0",
-    "typescript": "^5.9.3"
-  },
-  "lint-staged": {
-    "*.@(js|ts|tsx)": [
-      "oxlint --fix",
-      "oxfmt"
-    ],
-    "*.@(yml|yaml|md|json)": [
-      "prettier --write"
-    ],
-    "*.toml": [
-      "taplo format"
-    ]
-  },
   "ava": {
-    "extensions": {
-      "ts": "module"
-    },
-    "timeout": "2m",
-    "workerThreads": false,
     "environmentVariables": {
       "OXC_TSCONFIG_PATH": "./__test__/tsconfig.json"
+    },
+    "extensions": {
+      "ts": "module"
     },
     "nodeArguments": [
       "--import",
       "@oxc-node/core/register"
-    ]
+    ],
+    "timeout": "2m",
+    "workerThreads": false
+  },
+  "engines": {
+    "node": ">= 20.19.0"
   },
   "packageManager": "yarn@4.11.0"
 }

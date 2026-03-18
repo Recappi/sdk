@@ -2,18 +2,18 @@ name: CI
 env:
   DEBUG: napi:*
   APP_NAME: recording
-  MACOSX_DEPLOYMENT_TARGET: "10.13"
-  CARGO_INCREMENTAL: "1"
-"on":
+  MACOSX_DEPLOYMENT_TARGET: '10.13'
+  CARGO_INCREMENTAL: '1'
+'on':
   push:
     branches:
       - main
     tags-ignore:
-      - "**"
+      - '**'
     paths-ignore:
-      - "**/*.md"
+      - '**/*.md'
       - LICENSE
-      - "**/*.gitignore"
+      - '**/*.gitignore'
       - .editorconfig
       - docs/**
   pull_request: null
@@ -31,7 +31,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: "yarn"
+          cache: 'yarn'
 
       - name: Install
         uses: dtolnay/rust-toolchain@stable
@@ -40,6 +40,9 @@ jobs:
 
       - name: Install dependencies
         run: yarn install
+
+      - name: build ts
+        run: yarn build:ts
 
       - name: Oxlint
         run: yarn lint
@@ -143,9 +146,9 @@ jobs:
             target: x86_64-apple-darwin
             architecture: x64
         node:
-          - "20"
-          - "22"
-          - "22"
+          - '20'
+          - '22'
+          - '22'
     runs-on: ${{ matrix.settings.host }}
     steps:
       - uses: actions/checkout@v6
