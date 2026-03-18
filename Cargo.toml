@@ -33,7 +33,7 @@ screencapturekit = "1.5"
 uuid = { version = "1", features = ["v4"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-cpal = "0.16"
+cpal = "0.17"
 crossbeam-channel = "0.5"
 windows = { version = "0.62", features = [
   "Win32_Devices_FunctionDiscovery",

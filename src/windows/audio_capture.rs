@@ -9,10 +9,7 @@ use std::{
 };
 
 use audioadapter_buffers::direct::SequentialSliceOfVecs;
-use cpal::{
-  SampleRate,
-  traits::{DeviceTrait, HostTrait, StreamTrait},
-};
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use crossbeam_channel::unbounded;
 use napi::{
   Error, Status,
@@ -183,7 +180,7 @@ pub struct AudioCaptureSession {
   mic_stream: cpal::Stream,
   lb_stream: cpal::Stream,
   stopped: Arc<AtomicBool>,
-  sample_rate: SampleRate,
+  sample_rate: u32,
   channels: u32,
   jh: Option<JoinHandle<()>>, // background mixing thread
 }
@@ -192,7 +189,7 @@ pub struct AudioCaptureSession {
 impl AudioCaptureSession {
   #[napi(getter)]
   pub fn get_sample_rate(&self) -> f64 {
-    self.sample_rate.0 as f64
+    self.sample_rate as f64
   }
 
   #[napi(getter)]
@@ -203,7 +200,7 @@ impl AudioCaptureSession {
   #[napi(getter)]
   pub fn get_actual_sample_rate(&self) -> f64 {
     // For CPAL we always operate at the target rate which is sample_rate
-    self.sample_rate.0 as f64
+    self.sample_rate as f64
   }
 
   #[napi]
@@ -260,7 +257,7 @@ pub fn start_recording(
 
   let mic_sample_rate = mic_config.sample_rate();
   let lb_sample_rate = lb_config.sample_rate();
-  let target_rate = SampleRate(mic_sample_rate.min(lb_sample_rate).0);
+  let target_rate = mic_sample_rate.min(lb_sample_rate);
 
   let mic_channels = mic_config.channels();
   let lb_channels = lb_config.channels();
@@ -340,7 +337,7 @@ pub fn start_recording(
       // Resample when enough samples are available
       while pre_mic.len() >= RESAMPLER_INPUT_CHUNK {
         let to_resample: Vec<f32> = pre_mic.drain(..RESAMPLER_INPUT_CHUNK).collect();
-        let processed = process_audio_with_resampler(to_resample, mic_sample_rate.0, target_rate.0);
+        let processed = process_audio_with_resampler(to_resample, mic_sample_rate, target_rate);
         if !processed.is_empty() {
           post_mic.extend_from_slice(&processed);
         }
@@ -348,7 +345,7 @@ pub fn start_recording(
 
       while pre_lb.len() >= RESAMPLER_INPUT_CHUNK {
         let to_resample: Vec<f32> = pre_lb.drain(..RESAMPLER_INPUT_CHUNK).collect();
-        let processed = process_audio_with_resampler(to_resample, lb_sample_rate.0, target_rate.0);
+        let processed = process_audio_with_resampler(to_resample, lb_sample_rate, target_rate);
         if !processed.is_empty() {
           post_lb.extend_from_slice(&processed);
         }
