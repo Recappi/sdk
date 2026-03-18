@@ -47,7 +47,7 @@
     "lint": "vp lint .",
     "prepublishOnly": "napi prepublish -t npm",
     "test": "ava",
-    "preversion": "napi build --platform && git add .",
+    "preversion": "yarn build:debug && git add .",
     "version": "napi version",
     "prepare": "vp config"
   },
