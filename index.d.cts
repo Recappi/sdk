@@ -26,35 +26,17 @@ export declare class AudioCaptureSession {
 }
 
 export declare class ShareableContent {
-  static onApplicationListChanged(callback: (err: Error | null) => void): ApplicationListChangedSubscriber
-  static onAppStateChanged(
-    app: ApplicationInfo,
-    callback: (err: Error | null) => void,
-  ): ApplicationStateChangedSubscriber
+  static onApplicationListChanged(callback: ((err: Error | null, ) => void)): ApplicationListChangedSubscriber
+  static onAppStateChanged(app: ApplicationInfo, callback: ((err: Error | null, ) => void)): ApplicationStateChangedSubscriber
   constructor()
   static applications(): Array<ApplicationInfo>
   static applicationWithProcessId(processId: number): ApplicationInfo | null
   static isUsingMicrophone(processId: number): boolean
-  static tapAudio(
-    processId: number,
-    audioStreamCallback: (err: Error | null, arg: Float32Array) => void,
-  ): AudioCaptureSession
-  static tapGlobalAudio(
-    excludedProcesses: Array<ApplicationInfo> | undefined | null,
-    audioStreamCallback: (err: Error | null, arg: Float32Array) => void,
-  ): AudioCaptureSession
+  static tapAudio(processId: number, audioStreamCallback: ((err: Error | null, arg: Float32Array) => void)): AudioCaptureSession
+  static tapGlobalAudio(excludedProcesses: Array<ApplicationInfo> | undefined | null, audioStreamCallback: ((err: Error | null, arg: Float32Array) => void)): AudioCaptureSession
 }
 
-export declare function decodeAudio(
-  buf: Uint8Array,
-  destSampleRate?: number | undefined | null,
-  filename?: string | undefined | null,
-  signal?: AbortSignal | undefined | null,
-): Promise<Float32Array>
+export declare function decodeAudio(buf: Uint8Array, destSampleRate?: number | undefined | null, filename?: string | undefined | null, signal?: AbortSignal | undefined | null): Promise<Float32Array>
 
 /** Decode audio file into a Float32Array */
-export declare function decodeAudioSync(
-  buf: Uint8Array,
-  destSampleRate?: number | undefined | null,
-  filename?: string | undefined | null,
-): Float32Array
+export declare function decodeAudioSync(buf: Uint8Array, destSampleRate?: number | undefined | null, filename?: string | undefined | null): Float32Array
