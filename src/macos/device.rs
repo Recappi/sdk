@@ -1,7 +1,7 @@
 use std::ptr;
 
 use core_foundation::{base::TCFType, string::CFString};
-use coreaudio::sys::{
+use coreaudio_sys::{
   AudioDeviceID, AudioObjectID, CFStringRef, kAudioDevicePropertyDeviceUID,
   kAudioObjectSystemObject,
 };

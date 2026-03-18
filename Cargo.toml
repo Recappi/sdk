@@ -21,7 +21,7 @@ thiserror = "2"
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6"
 core-foundation = { version = "0.10", features = ["with-uuid"] }
-coreaudio-rs = "0.12"
+coreaudio-sys = "0.2"
 dispatch2 = "0.3"
 libc = "0.2"
 objc2 = "0.6"

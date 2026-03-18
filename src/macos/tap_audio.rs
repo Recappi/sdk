@@ -7,7 +7,7 @@ use core_foundation::{
   string::CFString,
   uuid::CFUUID,
 };
-use coreaudio::sys::{
+use coreaudio_sys::{
   AudioDeviceCreateIOProcIDWithBlock, AudioDeviceDestroyIOProcID, AudioDeviceIOProcID,
   AudioDeviceStart, AudioDeviceStop, AudioHardwareCreateAggregateDevice,
   AudioHardwareDestroyAggregateDevice, AudioObjectAddPropertyListenerBlock,
@@ -561,7 +561,7 @@ impl AudioTapStream {
       };
 
       let mut size = std::mem::size_of::<f64>() as u32;
-      coreaudio::sys::AudioObjectGetPropertyData(
+      coreaudio_sys::AudioObjectGetPropertyData(
         device_id,
         &address,
         0,

@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, ffi::c_void};
 
-use coreaudio::sys::kAudioHardwareBadStreamError;
+use coreaudio_sys::kAudioHardwareBadStreamError;
 use objc2::{Encode, Encoding, RefEncode};
 
 use crate::{error::CoreAudioError, utils::process_audio_frame};

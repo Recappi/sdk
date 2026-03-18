@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, ffi::c_void, mem::size_of};
 
 use audioadapter_buffers::direct::SequentialSliceOfVecs;
 use core_foundation::string::CFString;
-use coreaudio::sys::{
+use coreaudio_sys::{
   AudioObjectGetPropertyData, AudioObjectID, AudioObjectPropertyAddress,
   kAudioObjectPropertyElementMain, kAudioObjectPropertyScopeGlobal,
 };
