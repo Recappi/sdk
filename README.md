@@ -15,6 +15,21 @@ Linux packages now ship the decoder helpers as first-class supported exports.
 The `ShareableContent` capture APIs still require platform-specific backends
 and remain available only on macOS and Windows for now.
 
+If your application needs to choose a Linux fallback backend dynamically, use
+`getPlatformCapabilities()` instead of hard-coding platform checks.
+
+```typescript
+import { getPlatformCapabilities } from '@recappi/sdk'
+
+const capabilities = getPlatformCapabilities()
+
+if (capabilities.tapGlobalAudio) {
+  console.log('Use Recappi for realtime capture')
+} else {
+  console.log('Use your Linux-specific fallback backend')
+}
+```
+
 ## Usage
 
 ### Recording system audio

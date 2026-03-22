@@ -575,6 +575,24 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
+function getPlatformCapabilities() {
+  const shareableContent = nativeBinding?.ShareableContent
+
+  return {
+    platform: process.platform,
+    arch: process.arch,
+    decodeAudio: typeof nativeBinding?.decodeAudio === 'function',
+    decodeAudioSync: typeof nativeBinding?.decodeAudioSync === 'function',
+    applicationListing: typeof shareableContent?.applications === 'function',
+    applicationLookup: typeof shareableContent?.applicationWithProcessId === 'function',
+    applicationListEvents: typeof shareableContent?.onApplicationListChanged === 'function',
+    applicationStateEvents: typeof shareableContent?.onAppStateChanged === 'function',
+    microphoneState: typeof shareableContent?.isUsingMicrophone === 'function',
+    tapAudio: typeof shareableContent?.tapAudio === 'function',
+    tapGlobalAudio: typeof shareableContent?.tapGlobalAudio === 'function',
+  }
+}
+
 module.exports = nativeBinding
 module.exports.ApplicationInfo = nativeBinding.ApplicationInfo
 module.exports.ApplicationListChangedSubscriber = nativeBinding.ApplicationListChangedSubscriber
@@ -583,3 +601,4 @@ module.exports.AudioCaptureSession = nativeBinding.AudioCaptureSession
 module.exports.ShareableContent = nativeBinding.ShareableContent
 module.exports.decodeAudio = nativeBinding.decodeAudio
 module.exports.decodeAudioSync = nativeBinding.decodeAudioSync
+module.exports.getPlatformCapabilities = getPlatformCapabilities
