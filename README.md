@@ -2,9 +2,25 @@
 
 [![CI](https://github.com/Recappi/sdk/actions/workflows/CI.yml/badge.svg)](https://github.com/Recappi/sdk/actions/workflows/CI.yml)
 
+## Platform support
+
+| Feature | macOS | Windows | Linux |
+| --- | --- | --- | --- |
+| `decodeAudio` / `decodeAudioSync` | Yes | Yes | Yes |
+| `ShareableContent.applications()` | Yes | Yes | Not yet |
+| `ShareableContent.tapAudio()` | Yes | Yes | Not yet |
+| `ShareableContent.tapGlobalAudio()` | Yes | Yes | Not yet |
+
+Linux packages now ship the decoder helpers as first-class supported exports.
+The `ShareableContent` capture APIs still require platform-specific backends
+and remain available only on macOS and Windows for now.
+
 ## Usage
 
 ### Recording system audio
+
+> Available on macOS and Windows. Linux builds currently support the decoder
+> helpers only.
 
 Both input and output devices are recording, mixed into a single audio stream.
 
@@ -64,6 +80,8 @@ await writeFile('output.wav', wavBuffer)
 
 ### Listing running applications
 
+> Available on macOS and Windows.
+
 ```typescript
 import { ShareableContent } from '@recappi/sdk'
 
@@ -75,6 +93,8 @@ for (const app of apps) {
 ```
 
 ### Recording specific application
+
+> Available on macOS and Windows.
 
 ```typescript
 import { ShareableContent } from '@recappi/sdk'
