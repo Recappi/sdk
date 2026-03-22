@@ -194,7 +194,7 @@ mod tests {
     let bits_per_sample = 16u16;
     let block_align = channels * (bits_per_sample / 8);
     let byte_rate = sample_rate * u32::from(block_align);
-    let data_size = (samples.len() * std::mem::size_of::<i16>()) as u32;
+    let data_size = std::mem::size_of_val(samples) as u32;
     let riff_chunk_size = 36 + data_size;
 
     let mut wav = Vec::with_capacity((44 + data_size) as usize);
@@ -230,8 +230,8 @@ mod tests {
     let wav = create_pcm_wav(
       &[
         8192, 8192, // 0.25 + 0.25 -> 0.25
-        16384, 0,   // 0.5 + 0.0 -> 0.25
-        0, 0,       // silence
+        16384, 0, // 0.5 + 0.0 -> 0.25
+        0, 0, // silence
       ],
       2,
       48_000,
@@ -250,8 +250,8 @@ mod tests {
     let input = vec![4096i16; 480];
     let wav = create_pcm_wav(&input, 1, 48_000);
 
-    let decoded = decode(wav, Some(24_000), Some("fixture.wav"))
-      .expect("decode with resample should succeed");
+    let decoded =
+      decode(wav, Some(24_000), Some("fixture.wav")).expect("decode with resample should succeed");
 
     assert!(
       (decoded.len() as isize - 240).abs() <= 2,
