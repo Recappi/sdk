@@ -16,8 +16,11 @@
     "./playground"
   ],
   "files": [
-    "index.d.ts",
-    "index.js",
+    "index.cjs",
+    "index.d.cts",
+    "linux-shareable-content.cjs",
+    "native.cjs",
+    "native.d.cts",
     "./dist/**/*"
   ],
   "type": "module",
@@ -37,9 +40,10 @@
   "scripts": {
     "artifacts": "napi artifacts",
     "bench": "node --import @oxc-node/core/register benchmark/bench.ts",
-    "build": "napi build --platform --release --js index.cjs --dts index.d.cts",
-    "build:debug": "napi build --platform --js index.cjs --dts index.d.cts",
+    "build": "napi build --platform --release --js native.cjs --dts native.d.cts",
+    "build:debug": "napi build --platform --js native.cjs --dts native.d.cts",
     "build:ts": "tsc",
+    "dev:linux:docker": "bash ./scripts/docker-linux.sh bash",
     "format": "run-p format:js format:rs format:toml",
     "format:js": "vp fmt .",
     "format:toml": "taplo format",
@@ -47,6 +51,7 @@
     "lint": "vp lint .",
     "prepublishOnly": "napi prepublish -t npm",
     "test": "ava",
+    "test:linux:docker": "bash ./scripts/test-linux-docker.sh",
     "preversion": "yarn build:debug && git add .",
     "version": "napi version",
     "prepare": "vp config"

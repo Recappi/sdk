@@ -7,13 +7,18 @@
 | Feature | macOS | Windows | Linux |
 | --- | --- | --- | --- |
 | `decodeAudio` / `decodeAudioSync` | Yes | Yes | Yes |
-| `ShareableContent.applications()` | Yes | Yes | Not yet |
-| `ShareableContent.tapAudio()` | Yes | Yes | Not yet |
-| `ShareableContent.tapGlobalAudio()` | Yes | Yes | Not yet |
+| `ShareableContent.applications()` | Yes | Yes | Yes |
+| `ShareableContent.applicationWithProcessId()` | Yes | Yes | Yes |
+| `ShareableContent.onApplicationListChanged()` | Yes | Yes | Yes (polling) |
+| `ShareableContent.isUsingMicrophone()` | Yes | Yes | Yes (PulseAudio) |
+| `ShareableContent.onAppStateChanged()` | Yes | Yes | Yes (polling) |
+| `ShareableContent.tapGlobalAudio()` | Yes | Yes | Yes (PulseAudio monitor) |
+| `ShareableContent.tapAudio()` | Yes | Yes | Yes (best-effort global fallback) |
 
-Linux packages now ship the decoder helpers as first-class supported exports.
-The `ShareableContent` capture APIs still require platform-specific backends
-and remain available only on macOS and Windows for now.
+Linux now ships the same top-level `ShareableContent` surface as macOS and
+Windows. The Linux implementation uses a PulseAudio-compatible userspace and
+shells out to `pactl` / `ffmpeg`, so capture requires those tools to be
+available at runtime.
 
 If your application needs to choose a Linux fallback backend dynamically, use
 `getPlatformCapabilities()` instead of hard-coding platform checks.
@@ -34,8 +39,8 @@ if (capabilities.tapGlobalAudio) {
 
 ### Recording system audio
 
-> Available on macOS and Windows. Linux builds currently support the decoder
-> helpers only.
+> Available on macOS, Windows, and Linux. Linux capture requires a
+> PulseAudio-compatible server plus `pactl` and `ffmpeg`.
 
 Both input and output devices are recording, mixed into a single audio stream.
 
@@ -95,7 +100,7 @@ await writeFile('output.wav', wavBuffer)
 
 ### Listing running applications
 
-> Available on macOS and Windows.
+> Available on macOS, Windows, and Linux.
 
 ```typescript
 import { ShareableContent } from '@recappi/sdk'
@@ -109,7 +114,9 @@ for (const app of apps) {
 
 ### Recording specific application
 
-> Available on macOS and Windows.
+> Available on macOS, Windows, and Linux.
+> On Linux and Windows, `tapAudio()` currently uses the same capture backend as
+> `tapGlobalAudio()` and does not isolate a single process stream yet.
 
 ```typescript
 import { ShareableContent } from '@recappi/sdk'
@@ -141,3 +148,21 @@ yarn build
 yarn workspace playground dev:server
 yarn workspace playground dev:web
 ```
+
+## Local Linux Iteration From macOS
+
+Use the bundled Docker environment to exercise the Linux backend locally from a
+macOS workstation.
+
+```sh
+yarn test:linux:docker
+```
+
+If you want an interactive shell inside the same Linux image:
+
+```sh
+yarn dev:linux:docker
+```
+
+The Docker image installs Rust, Node.js, PulseAudio, `pactl`, and `ffmpeg`, so
+the Linux binding tests can run without depending on the host machine.

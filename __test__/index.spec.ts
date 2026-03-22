@@ -7,6 +7,21 @@ test('should expose audio decoder helpers', (t) => {
   t.is(typeof sdk.decodeAudioSync, 'function')
 })
 
+test('should expose the shareable content surface on every supported desktop platform', (t) => {
+  t.is(typeof sdk.ApplicationInfo, 'function')
+  t.is(typeof sdk.ApplicationListChangedSubscriber, 'function')
+  t.is(typeof sdk.ApplicationStateChangedSubscriber, 'function')
+  t.is(typeof sdk.AudioCaptureSession, 'function')
+  t.is(typeof sdk.ShareableContent, 'function')
+  t.is(typeof sdk.ShareableContent.applications, 'function')
+  t.is(typeof sdk.ShareableContent.applicationWithProcessId, 'function')
+  t.is(typeof sdk.ShareableContent.onApplicationListChanged, 'function')
+  t.is(typeof sdk.ShareableContent.onAppStateChanged, 'function')
+  t.is(typeof sdk.ShareableContent.isUsingMicrophone, 'function')
+  t.is(typeof sdk.ShareableContent.tapAudio, 'function')
+  t.is(typeof sdk.ShareableContent.tapGlobalAudio, 'function')
+})
+
 test('should expose platform capability metadata', (t) => {
   const capabilities = sdk.getPlatformCapabilities()
 
@@ -14,18 +29,24 @@ test('should expose platform capability metadata', (t) => {
   t.is(capabilities.decodeAudio, true)
   t.is(capabilities.decodeAudioSync, true)
 
-  const expectsShareableContent = process.platform === 'darwin' || process.platform === 'win32'
+  const expectsShareableContent =
+    process.platform === 'darwin' ||
+    process.platform === 'win32' ||
+    process.platform === 'linux'
   t.is(capabilities.applicationListing, expectsShareableContent)
+  t.is(capabilities.applicationLookup, expectsShareableContent)
+  t.is(capabilities.applicationListEvents, expectsShareableContent)
+  t.is(capabilities.applicationStateEvents, expectsShareableContent)
+  t.is(capabilities.microphoneState, expectsShareableContent)
   t.is(capabilities.tapAudio, expectsShareableContent)
   t.is(capabilities.tapGlobalAudio, expectsShareableContent)
 })
 
-test('should only expose shareable capture APIs on platforms with a native backend', (t) => {
-  if (process.platform === 'darwin' || process.platform === 'win32') {
+test('should make application discovery available on supported desktop platforms', (t) => {
+  if (process.platform === 'darwin' || process.platform === 'win32' || process.platform === 'linux') {
     t.true(Array.isArray(sdk.ShareableContent.applications()))
     return
   }
 
-  // @ts-expect-error - ShareableContent is not defined on decoder-only platforms
-  t.is(sdk.ShareableContent, undefined)
+  t.false('ShareableContent' in sdk)
 })

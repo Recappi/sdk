@@ -191,6 +191,11 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: yarn
           architecture: ${{ matrix.settings.architecture }}
+      - name: Install Linux audio tools
+        if: ${{ matrix.settings.host == 'ubuntu-latest' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg pulseaudio pulseaudio-utils
       - name: Install dependencies
         run: yarn install
       - name: Download artifacts
