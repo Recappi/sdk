@@ -158,13 +158,13 @@ Use the bundled Docker environment to exercise the Linux backend locally from a
 macOS workstation.
 
 ```sh
-yarn test:linux:docker
+bash ./scripts/test-linux-docker.sh
 ```
 
 If you want an interactive shell inside the same Linux image:
 
 ```sh
-yarn dev:linux:docker
+bash ./scripts/docker-linux.sh bash
 ```
 
 The Docker image installs Rust, Node.js, PulseAudio, `pactl`, and `ffmpeg`, so

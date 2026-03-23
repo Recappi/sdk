@@ -43,7 +43,6 @@
     "build": "napi build --platform --release --js native.cjs --dts native.d.cts",
     "build:debug": "napi build --platform --js native.cjs --dts native.d.cts",
     "build:ts": "tsc",
-    "dev:linux:docker": "bash ./scripts/docker-linux.sh bash",
     "format": "run-p format:js format:rs format:toml",
     "format:js": "vp fmt .",
     "format:toml": "taplo format",
@@ -51,7 +50,6 @@
     "lint": "vp lint .",
     "prepublishOnly": "napi prepublish -t npm",
     "test": "ava",
-    "test:linux:docker": "bash ./scripts/test-linux-docker.sh",
     "preversion": "yarn build:debug && git add .",
     "version": "napi version",
     "prepare": "vp config"
