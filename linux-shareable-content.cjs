@@ -9,6 +9,19 @@ const DEFAULT_CHANNELS = 1
 const POLL_INTERVAL_MS = 1_000
 const LINUX_CAPTURE_ERROR_CODE = 'ERR_RECAPPI_LINUX_BACKEND'
 
+function isCommandAvailable(command, env = process.env) {
+  const result = spawnSync(
+    '/bin/sh',
+    ['-lc', `command -v ${JSON.stringify(command)} >/dev/null 2>&1`],
+    {
+      env,
+      stdio: 'ignore',
+    },
+  )
+
+  return result.status === 0
+}
+
 function createLinuxBackendError(feature, detail) {
   const suffix = detail ? ` ${detail}` : ''
   const error = new Error(
@@ -115,8 +128,10 @@ function readSourceOutputs(env = process.env) {
       if (!processIdMatch) {
         return null
       }
+      const sourceMatch = section.match(/^\s*Source:\s+(\d+)$/m)
 
       return {
+        source: sourceMatch ? Number(sourceMatch[1]) : undefined,
         properties: {
           'application.process.id': processIdMatch[1],
         },
@@ -125,12 +140,71 @@ function readSourceOutputs(env = process.env) {
     .filter(Boolean)
 }
 
+function readSources(env = process.env) {
+  try {
+    const jsonOutput = runCommand('pactl', ['--format=json', 'list', 'sources'], { env })
+    const parsed = JSON.parse(jsonOutput)
+    if (Array.isArray(parsed)) {
+      return parsed
+    }
+  } catch {
+    // Fall through to the plain-text parser for older pactl versions.
+  }
+
+  const textOutput = runCommand('pactl', ['list', 'sources'], { env })
+  const sections = textOutput.split(/\n(?=Source #)/)
+
+  return sections
+    .map((section) => {
+      const indexMatch = section.match(/^Source #(\d+)/m)
+      if (!indexMatch) {
+        return null
+      }
+
+      const nameMatch = section.match(/^\s*Name:\s+(.+)$/m)
+      const monitorOfSinkMatch = section.match(/^\s*Monitor of Sink:\s+(.+)$/m)
+      const deviceClassMatch = section.match(/device\.class = "([^"]+)"/)
+
+      return {
+        index: Number(indexMatch[1]),
+        name: nameMatch ? nameMatch[1].trim() : '',
+        monitor_source: monitorOfSinkMatch ? monitorOfSinkMatch[1].trim() : '',
+        properties: {
+          'device.class': deviceClassMatch ? deviceClassMatch[1] : '',
+        },
+      }
+    })
+    .filter(Boolean)
+}
+
+function isMonitorSource(source) {
+  const monitorSource = source?.monitor_source
+  const deviceClass = source?.properties?.['device.class']
+  const name = source?.name || ''
+
+  return (
+    deviceClass === 'monitor' ||
+    name.endsWith('.monitor') ||
+    (typeof monitorSource === 'string' && monitorSource !== '' && monitorSource !== 'n/a')
+  )
+}
+
 function readActiveMicrophoneProcessIds(env = process.env) {
   const activeProcesses = new Set()
+  const monitorSourceIds = new Set(
+    readSources(env)
+      .filter(isMonitorSource)
+      .map((source) => Number(source.index))
+      .filter(Number.isFinite),
+  )
 
   for (const sourceOutput of readSourceOutputs(env)) {
     const processId = sourceOutput?.properties?.['application.process.id']
     if (!processId) {
+      continue
+    }
+    const sourceId = Number(sourceOutput?.source)
+    if (Number.isFinite(sourceId) && monitorSourceIds.has(sourceId)) {
       continue
     }
 
@@ -138,6 +212,41 @@ function readActiveMicrophoneProcessIds(env = process.env) {
   }
 
   return activeProcesses
+}
+
+function canReadPulseInfo(env = process.env) {
+  try {
+    readPulseInfo(env)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function canResolveMonitorSource(env = process.env) {
+  try {
+    return Boolean(resolveMonitorSource(env))
+  } catch {
+    return false
+  }
+}
+
+function getLinuxPlatformCapabilities(env = process.env) {
+  const hasPs = isCommandAvailable('ps', env)
+  const hasPactl = isCommandAvailable('pactl', env)
+  const hasFfmpeg = isCommandAvailable('ffmpeg', env)
+  const pulseRuntimeReady = hasPactl && canReadPulseInfo(env)
+  const captureRuntimeReady = pulseRuntimeReady && hasFfmpeg && canResolveMonitorSource(env)
+
+  return {
+    applicationListing: hasPs,
+    applicationLookup: hasPs,
+    applicationListEvents: hasPs,
+    applicationStateEvents: pulseRuntimeReady,
+    microphoneState: pulseRuntimeReady,
+    tapAudio: captureRuntimeReady,
+    tapGlobalAudio: captureRuntimeReady,
+  }
 }
 
 function resolveMonitorSource(env = process.env) {
@@ -444,12 +553,16 @@ function createPrivatePulseFixture() {
   const rootDir = mkdtempSync(join(tmpdir(), 'recappi-linux-pulse-'))
   const runtimeDir = join(rootDir, 'runtime')
   const sinkName = `recappi_sink_${process.pid}`
+  const microphoneSource = `recappi_mic_${process.pid}`
+  const microphonePipePath = join(rootDir, 'mic.pipe')
 
   return {
     rootDir,
     runtimeDir,
     sinkName,
     monitorSource: `${sinkName}.monitor`,
+    microphoneSource,
+    microphonePipePath,
     cleanup() {
       rmSync(rootDir, { recursive: true, force: true })
     },
@@ -469,22 +582,44 @@ function startPrivatePulseServer(fixture) {
     ['--daemonize=yes', '--exit-idle-time=-1', '--log-target=stderr'],
     { env },
   )
-  const moduleId = runCommand(
+  const sinkModuleId = runCommand(
     'pactl',
     ['load-module', 'module-null-sink', `sink_name=${fixture.sinkName}`],
     { env },
   )
+  const sourceModuleId = runCommand(
+    'pactl',
+    [
+      'load-module',
+      'module-pipe-source',
+      `source_name=${fixture.microphoneSource}`,
+      `file=${fixture.microphonePipePath}`,
+      `rate=${DEFAULT_SAMPLE_RATE}`,
+      `channels=${DEFAULT_CHANNELS}`,
+      'format=s16le',
+    ],
+    { env },
+  )
   runCommand('pactl', ['set-default-sink', fixture.sinkName], { env })
+  runCommand('pactl', ['set-default-source', fixture.microphoneSource], { env })
 
   return {
     env: {
-      ...env,
+      HOME: fixture.rootDir,
+      XDG_RUNTIME_DIR: fixture.runtimeDir,
       PULSE_SINK: fixture.sinkName,
       RECAPPI_PULSE_MONITOR_SOURCE: fixture.monitorSource,
+      RECAPPI_PULSE_SOURCE: fixture.microphoneSource,
     },
     stop() {
       try {
-        runCommand('pactl', ['unload-module', moduleId], { env })
+        runCommand('pactl', ['unload-module', sourceModuleId], { env })
+      } catch {
+        // Ignore teardown issues so tests can clean up best-effort.
+      }
+
+      try {
+        runCommand('pactl', ['unload-module', sinkModuleId], { env })
       } catch {
         // Ignore teardown issues so tests can clean up best-effort.
       }
@@ -497,7 +632,7 @@ function startPrivatePulseServer(fixture) {
   }
 }
 
-function playSineTone(env, sinkName, durationSeconds = 2.5) {
+function playSineTone(env, sinkName, durationSeconds = 2.5, frequency = 440) {
   const wavPath = join(tmpdir(), `recappi-tone-${process.pid}.wav`)
 
   runCommand('ffmpeg', [
@@ -508,7 +643,7 @@ function playSineTone(env, sinkName, durationSeconds = 2.5) {
     '-f',
     'lavfi',
     '-i',
-    `sine=frequency=440:duration=${durationSeconds}:sample_rate=${DEFAULT_SAMPLE_RATE}`,
+    `sine=frequency=${frequency}:duration=${durationSeconds}:sample_rate=${DEFAULT_SAMPLE_RATE}`,
     '-ac',
     '1',
     wavPath,
@@ -521,6 +656,73 @@ function playSineTone(env, sinkName, durationSeconds = 2.5) {
   }
 }
 
+function startSineToneToSource(
+  env,
+  pipePath,
+  durationSeconds = 2.5,
+  frequency = 660,
+) {
+  const ffmpegProc = spawn(
+    'ffmpeg',
+    [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-nostdin',
+      '-re',
+      '-f',
+      'lavfi',
+      '-i',
+      `sine=frequency=${frequency}:duration=${durationSeconds}:sample_rate=${DEFAULT_SAMPLE_RATE}`,
+      '-ac',
+      String(DEFAULT_CHANNELS),
+      '-f',
+      's16le',
+      '-y',
+      pipePath,
+    ],
+    {
+      env,
+      stdio: ['ignore', 'ignore', 'pipe'],
+    },
+  )
+
+  let stderrBuffer = ''
+  ffmpegProc.stderr.on('data', (chunk) => {
+    stderrBuffer += String(chunk)
+  })
+
+  return {
+    process: ffmpegProc,
+    wait() {
+      return new Promise((resolve, reject) => {
+        ffmpegProc.on('error', (error) => {
+          reject(
+            createLinuxBackendError(
+              'ShareableContent.tapGlobalAudio',
+              `Failed to launch ffmpeg source writer: ${error.message}`,
+            ),
+          )
+        })
+
+        ffmpegProc.on('close', (code) => {
+          if (code === 0) {
+            resolve()
+            return
+          }
+
+          reject(
+            createLinuxBackendError(
+              'ShareableContent.tapGlobalAudio',
+              stderrBuffer.trim() || `ffmpeg source writer exited with ${code}`,
+            ),
+          )
+        })
+      })
+    },
+  }
+}
+
 module.exports = {
   ApplicationInfo,
   ApplicationListChangedSubscriber,
@@ -528,7 +730,9 @@ module.exports = {
   AudioCaptureSession,
   ShareableContent,
   createPrivatePulseFixture,
+  getLinuxPlatformCapabilities,
   startPrivatePulseServer,
   playSineTone,
+  startSineToneToSource,
   LINUX_CAPTURE_ERROR_CODE,
 }

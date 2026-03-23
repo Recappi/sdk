@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import test from 'ava'
 
 import sdk from '../index.cjs'
@@ -30,16 +32,31 @@ test('should expose platform capability metadata', (t) => {
   t.is(capabilities.decodeAudioSync, true)
 
   const expectsShareableContent =
-    process.platform === 'darwin' ||
-    process.platform === 'win32' ||
-    process.platform === 'linux'
+    process.platform === 'darwin' || process.platform === 'win32' || process.platform === 'linux'
   t.is(capabilities.applicationListing, expectsShareableContent)
   t.is(capabilities.applicationLookup, expectsShareableContent)
   t.is(capabilities.applicationListEvents, expectsShareableContent)
-  t.is(capabilities.applicationStateEvents, expectsShareableContent)
-  t.is(capabilities.microphoneState, expectsShareableContent)
-  t.is(capabilities.tapAudio, expectsShareableContent)
-  t.is(capabilities.tapGlobalAudio, expectsShareableContent)
+
+  if (process.platform === 'darwin' || process.platform === 'win32') {
+    t.true(capabilities.applicationStateEvents)
+    t.true(capabilities.microphoneState)
+    t.true(capabilities.tapAudio)
+    t.true(capabilities.tapGlobalAudio)
+    return
+  }
+
+  if (process.platform === 'linux') {
+    t.is(typeof capabilities.applicationStateEvents, 'boolean')
+    t.is(typeof capabilities.microphoneState, 'boolean')
+    t.is(typeof capabilities.tapAudio, 'boolean')
+    t.is(typeof capabilities.tapGlobalAudio, 'boolean')
+    return
+  }
+
+  t.false(capabilities.applicationStateEvents)
+  t.false(capabilities.microphoneState)
+  t.false(capabilities.tapAudio)
+  t.false(capabilities.tapGlobalAudio)
 })
 
 test('should make application discovery available on supported desktop platforms', (t) => {

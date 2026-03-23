@@ -8,19 +8,44 @@ function getShareableContentModule() {
 
 function getPlatformCapabilities() {
   const shareableContent = getShareableContentModule()?.ShareableContent
+  const linuxCapabilities =
+    process.platform === 'linux'
+      ? linuxShareableContent.getLinuxPlatformCapabilities?.(process.env)
+      : null
 
   return {
     platform: process.platform,
     arch: process.arch,
     decodeAudio: typeof nativeBinding?.decodeAudio === 'function',
     decodeAudioSync: typeof nativeBinding?.decodeAudioSync === 'function',
-    applicationListing: typeof shareableContent?.applications === 'function',
-    applicationLookup: typeof shareableContent?.applicationWithProcessId === 'function',
-    applicationListEvents: typeof shareableContent?.onApplicationListChanged === 'function',
-    applicationStateEvents: typeof shareableContent?.onAppStateChanged === 'function',
-    microphoneState: typeof shareableContent?.isUsingMicrophone === 'function',
-    tapAudio: typeof shareableContent?.tapAudio === 'function',
-    tapGlobalAudio: typeof shareableContent?.tapGlobalAudio === 'function',
+    applicationListing:
+      process.platform === 'linux'
+        ? linuxCapabilities.applicationListing
+        : typeof shareableContent?.applications === 'function',
+    applicationLookup:
+      process.platform === 'linux'
+        ? linuxCapabilities.applicationLookup
+        : typeof shareableContent?.applicationWithProcessId === 'function',
+    applicationListEvents:
+      process.platform === 'linux'
+        ? linuxCapabilities.applicationListEvents
+        : typeof shareableContent?.onApplicationListChanged === 'function',
+    applicationStateEvents:
+      process.platform === 'linux'
+        ? linuxCapabilities.applicationStateEvents
+        : typeof shareableContent?.onAppStateChanged === 'function',
+    microphoneState:
+      process.platform === 'linux'
+        ? linuxCapabilities.microphoneState
+        : typeof shareableContent?.isUsingMicrophone === 'function',
+    tapAudio:
+      process.platform === 'linux'
+        ? linuxCapabilities.tapAudio
+        : typeof shareableContent?.tapAudio === 'function',
+    tapGlobalAudio:
+      process.platform === 'linux'
+        ? linuxCapabilities.tapGlobalAudio
+        : typeof shareableContent?.tapGlobalAudio === 'function',
   }
 }
 

@@ -4,24 +4,27 @@
 
 ## Platform support
 
-| Feature | macOS | Windows | Linux |
-| --- | --- | --- | --- |
-| `decodeAudio` / `decodeAudioSync` | Yes | Yes | Yes |
-| `ShareableContent.applications()` | Yes | Yes | Yes |
-| `ShareableContent.applicationWithProcessId()` | Yes | Yes | Yes |
-| `ShareableContent.onApplicationListChanged()` | Yes | Yes | Yes (polling) |
-| `ShareableContent.isUsingMicrophone()` | Yes | Yes | Yes (PulseAudio) |
-| `ShareableContent.onAppStateChanged()` | Yes | Yes | Yes (polling) |
-| `ShareableContent.tapGlobalAudio()` | Yes | Yes | Yes (PulseAudio monitor) |
-| `ShareableContent.tapAudio()` | Yes | Yes | Yes (best-effort global fallback) |
+| Feature                                       | macOS | Windows | Linux (x64 GNU)                   |
+| --------------------------------------------- | ----- | ------- | --------------------------------- |
+| `decodeAudio` / `decodeAudioSync`             | Yes   | Yes     | Yes                               |
+| `ShareableContent.applications()`             | Yes   | Yes     | Yes                               |
+| `ShareableContent.applicationWithProcessId()` | Yes   | Yes     | Yes                               |
+| `ShareableContent.onApplicationListChanged()` | Yes   | Yes     | Yes (polling)                     |
+| `ShareableContent.isUsingMicrophone()`        | Yes   | Yes     | Yes (PulseAudio)                  |
+| `ShareableContent.onAppStateChanged()`        | Yes   | Yes     | Yes (polling)                     |
+| `ShareableContent.tapGlobalAudio()`           | Yes   | Yes     | Yes (PulseAudio monitor)          |
+| `ShareableContent.tapAudio()`                 | Yes   | Yes     | Yes (best-effort global fallback) |
 
-Linux now ships the same top-level `ShareableContent` surface as macOS and
-Windows. The Linux implementation uses a PulseAudio-compatible userspace and
-shells out to `pactl` / `ffmpeg`, so capture requires those tools to be
-available at runtime.
+Published Linux artifacts currently target `x86_64-unknown-linux-gnu`. The
+Linux implementation ships the same top-level `ShareableContent` surface as
+macOS and Windows, but it uses a PulseAudio-compatible userspace and shells out
+to `pactl` / `ffmpeg`, so capture requires those tools to be available at
+runtime.
 
 If your application needs to choose a Linux fallback backend dynamically, use
-`getPlatformCapabilities()` instead of hard-coding platform checks.
+`getPlatformCapabilities()` instead of hard-coding platform checks. On Linux,
+those booleans reflect the currently reachable runtime prerequisites for each
+capture path, not just whether the functions are exported.
 
 ```typescript
 import { getPlatformCapabilities } from '@recappi/sdk'
