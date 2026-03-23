@@ -1,7 +1,7 @@
 use std::{
   collections::{HashMap, HashSet},
   env,
-  fs::read_link,
+  fs::{read_dir, read_link},
   io::{BufReader, Read},
   os::unix::fs::PermissionsExt,
   path::Path,
@@ -434,6 +434,72 @@ fn can_resolve_monitor_source() -> bool {
   resolve_monitor_source().is_ok()
 }
 
+fn pulseaudio_dump_modules_contains(module_name: &str) -> bool {
+  if !is_command_available("pulseaudio") {
+    return false;
+  }
+
+  run_command("pulseaudio", &["--dump-modules"], PROCESS_CAPTURE_FEATURE)
+    .map(|output| {
+      output
+        .lines()
+        .any(|line| line.split_whitespace().next() == Some(module_name))
+    })
+    .unwrap_or(false)
+}
+
+fn pulse_modules_exist_under(base_dir: &Path, max_depth: usize) -> bool {
+  fn visit(dir: &Path, depth: usize, max_depth: usize) -> bool {
+    let Ok(entries) = read_dir(dir) else {
+      return false;
+    };
+
+    for entry in entries.flatten() {
+      let path = entry.path();
+      if !path.is_dir() {
+        continue;
+      }
+
+      let file_name = entry.file_name();
+      let file_name = file_name.to_string_lossy();
+      if file_name.starts_with("pulse") {
+        let modules_dir = path.join("modules");
+        if modules_dir.join("module-null-sink.so").is_file()
+          && modules_dir.join("module-loopback.so").is_file()
+        {
+          return true;
+        }
+      }
+
+      if depth < max_depth && visit(&path, depth + 1, max_depth) {
+        return true;
+      }
+    }
+
+    false
+  }
+
+  visit(base_dir, 0, max_depth)
+}
+
+fn can_detect_process_capture_modules() -> bool {
+  if pulseaudio_dump_modules_contains("module-null-sink")
+    && pulseaudio_dump_modules_contains("module-loopback")
+  {
+    return true;
+  }
+
+  [
+    Path::new("/usr/lib"),
+    Path::new("/usr/lib64"),
+    Path::new("/usr/local/lib"),
+    Path::new("/lib"),
+    Path::new("/lib64"),
+  ]
+  .into_iter()
+  .any(|path| pulse_modules_exist_under(path, 2))
+}
+
 fn is_monitor_source_name(source_name: &str) -> bool {
   source_name.ends_with(".monitor")
 }
@@ -514,32 +580,56 @@ fn resolve_monitor_sink_name() -> Result<String> {
 }
 
 fn can_probe_process_capture_route() -> bool {
-  let Ok(pulse_info) = read_pulse_info() else {
-    return false;
-  };
-  if pulse_info.default_sink.is_empty() {
-    return false;
+  read_sink_inputs(PROCESS_CAPTURE_FEATURE).is_ok() && can_detect_process_capture_modules()
+}
+
+fn restore_moved_sink_inputs(
+  moved_inputs: &Arc<Mutex<HashMap<u32, String>>>,
+  fallback_sink: Option<&str>,
+) {
+  let moved_inputs = moved_inputs
+    .lock()
+    .map(|moved_inputs| moved_inputs.clone())
+    .unwrap_or_default();
+
+  for (input_index, original_sink) in moved_inputs {
+    let restore_sink = if original_sink.is_empty() {
+      fallback_sink
+    } else {
+      Some(original_sink.as_str())
+    };
+
+    if let Some(restore_sink) = restore_sink {
+      let _ = move_sink_input(input_index, restore_sink);
+    }
   }
-  if read_sink_inputs(PROCESS_CAPTURE_FEATURE).is_err() {
-    return false;
+}
+
+fn cleanup_process_start_failure(
+  moved_inputs: &Arc<Mutex<HashMap<u32, String>>>,
+  loopback_route: &Arc<Mutex<Option<LoopbackRoute>>>,
+  sink_module_id: &str,
+) {
+  restore_moved_sink_inputs(moved_inputs, None);
+
+  if let Ok(mut loopback_route) = loopback_route.lock()
+    && let Some(route) = loopback_route.take()
+  {
+    unload_module(&route.module_id, PROCESS_CAPTURE_FEATURE);
   }
 
-  let capture_sink = build_capture_sink_name("probe", None, next_capture_session_id());
-  let Ok(sink_module_id) = create_capture_sink(&capture_sink, PROCESS_CAPTURE_FEATURE) else {
-    return false;
-  };
+  unload_module(sink_module_id, PROCESS_CAPTURE_FEATURE);
+}
 
-  let loopback_result = create_loopback(
-    &format!("{}.monitor", capture_sink),
-    &pulse_info.default_sink,
-    PROCESS_CAPTURE_FEATURE,
-  );
-  if let Ok(loopback_module_id) = &loopback_result {
-    unload_module(loopback_module_id, PROCESS_CAPTURE_FEATURE);
-  }
-  unload_module(&sink_module_id, PROCESS_CAPTURE_FEATURE);
-
-  loopback_result.is_ok()
+fn cleanup_global_start_failure(
+  moved_inputs: &Arc<Mutex<HashMap<u32, String>>>,
+  loopback_module_id: &str,
+  sink_module_id: &str,
+  fallback_sink: &str,
+) {
+  restore_moved_sink_inputs(moved_inputs, Some(fallback_sink));
+  unload_module(loopback_module_id, CAPTURE_FEATURE);
+  unload_module(sink_module_id, CAPTURE_FEATURE);
 }
 
 fn reroute_global_sink_inputs(
@@ -644,7 +734,7 @@ impl ProcessTapRouting {
     if let Err(err) =
       reroute_process_sink_inputs(process_id, &capture_sink, &moved_inputs, &loopback_route)
     {
-      unload_module(&sink_module_id, PROCESS_CAPTURE_FEATURE);
+      cleanup_process_start_failure(&moved_inputs, &loopback_route, &sink_module_id);
       return Err(err);
     }
 
@@ -742,8 +832,12 @@ impl GlobalExcludedTapRouting {
       &excluded_process_ids,
       &moved_inputs,
     ) {
-      unload_module(&loopback_module_id, CAPTURE_FEATURE);
-      unload_module(&sink_module_id, CAPTURE_FEATURE);
+      cleanup_global_start_failure(
+        &moved_inputs,
+        &loopback_module_id,
+        &sink_module_id,
+        &target_sink,
+      );
       return Err(err);
     }
 
