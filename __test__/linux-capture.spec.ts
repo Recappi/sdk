@@ -28,6 +28,18 @@ const linuxBackend = require('./linux-pulse-fixture.cjs') as {
     tapAudio: boolean
     tapGlobalAudio: boolean
   }
+  loadNullSink: (
+    env: NodeJS.ProcessEnv,
+    sinkName?: string,
+  ) => {
+    sinkName: string
+    monitorSource: string
+    unload: () => void
+  }
+  readModules: (env?: NodeJS.ProcessEnv) => Array<{
+    name: string
+    argument: string
+  }>
   startPrivatePulseServer: (fixture: {
     rootDir: string
     runtimeDir: string
@@ -267,6 +279,59 @@ test.serial('linux capture backend should mix microphone and app audio when both
   })
 })
 
+test.serial('linux tapGlobalAudio should honor excluded processes on the captured sink', async (t) => {
+  if (process.platform !== 'linux') {
+    t.pass()
+    return
+  }
+
+  await withPrivatePulseRuntime(async ({ fixture }) => {
+    let session: InstanceType<typeof sdk.AudioCaptureSession> | null = null
+    let callbackError: Error | null = null
+    const buffers: Float32Array[] = []
+
+    try {
+      process.env.RECAPPI_PULSE_SOURCE = fixture.monitorSource
+      const includedTone = linuxBackend.startSineTonePlayer(process.env, fixture.sinkName, 3.5, 440)
+      const excludedTone = linuxBackend.startSineTonePlayer(process.env, fixture.sinkName, 3.5, 880)
+      const excludedApp = new sdk.ApplicationInfo(excludedTone.pid, 'excluded-tone', excludedTone.pid)
+
+      await delay(200)
+      session = sdk.ShareableContent.tapGlobalAudio([excludedApp], (err: Error | null, samples?: Float32Array) => {
+        if (err) {
+          callbackError = err
+          return
+        }
+
+        if (samples && samples.length > 0) {
+          buffers.push(samples)
+        }
+      })
+
+      await Promise.all([includedTone.wait(), excludedTone.wait()])
+      await delay(400)
+      session.stop()
+      await delay(200)
+
+      t.is(callbackError, null)
+      t.true(buffers.length > 0)
+
+      const merged = mergeBuffers(buffers)
+      const amplitude = maxAmplitude(merged)
+      const includedMagnitude = measureFrequencyMagnitude(merged, 16_000, 440)
+      const excludedMagnitude = measureFrequencyMagnitude(merged, 16_000, 880)
+      const offTargetMagnitude = measureFrequencyMagnitude(merged, 16_000, 1_200)
+
+      t.true(merged.length >= 16_000)
+      t.true(amplitude > 0.01)
+      t.true(includedMagnitude > offTargetMagnitude * 3)
+      t.true(includedMagnitude > excludedMagnitude * 3)
+    } finally {
+      session?.stop()
+    }
+  })
+})
+
 test.serial('linux tapAudio should isolate the target process output via a dedicated Pulse sink', async (t) => {
   if (process.platform !== 'linux') {
     t.pass()
@@ -317,6 +382,64 @@ test.serial('linux tapAudio should isolate the target process output via a dedic
       t.true(targetMagnitude > backgroundMagnitude * 3)
     } finally {
       session?.stop()
+    }
+  })
+})
+
+test.serial('linux tapAudio should loop captured audio back to the source sink', async (t) => {
+  if (process.platform !== 'linux') {
+    t.pass()
+    return
+  }
+
+  await withPrivatePulseRuntime(async ({ fixture }) => {
+    let session: InstanceType<typeof sdk.AudioCaptureSession> | null = null
+    let callbackError: Error | null = null
+    const buffers: Float32Array[] = []
+    const alternateSink = linuxBackend.loadNullSink(process.env)
+
+    try {
+      process.env.RECAPPI_PULSE_SOURCE = fixture.monitorSource
+      const targetTone = linuxBackend.startSineTonePlayer(process.env, alternateSink.sinkName, 3.5, 440)
+
+      await delay(200)
+      session = sdk.ShareableContent.tapAudio(targetTone.pid, (err: Error | null, samples?: Float32Array) => {
+        if (err) {
+          callbackError = err
+          return
+        }
+
+        if (samples && samples.length > 0) {
+          buffers.push(samples)
+        }
+      })
+
+      await delay(400)
+      const loopbackModules = linuxBackend
+        .readModules(process.env)
+        .filter((module) => module.name === 'module-loopback')
+      const captureSinkPrefix = `source=recappi_capture_${targetTone.pid}_${process.pid}_`
+      const expectedLoopback = loopbackModules.find(
+        (module) =>
+          module.argument.includes(captureSinkPrefix) && module.argument.includes(`sink=${alternateSink.sinkName}`),
+      )
+      const wrongLoopback = loopbackModules.find(
+        (module) => module.argument.includes(captureSinkPrefix) && module.argument.includes(`sink=${fixture.sinkName}`),
+      )
+
+      t.truthy(expectedLoopback)
+      t.falsy(wrongLoopback)
+
+      await targetTone.wait()
+      await delay(300)
+      session.stop()
+      await delay(200)
+
+      t.is(callbackError, null)
+      t.true(buffers.length > 0)
+    } finally {
+      session?.stop()
+      alternateSink.unload()
     }
   })
 })

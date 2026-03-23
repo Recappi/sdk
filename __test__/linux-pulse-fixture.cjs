@@ -665,6 +665,42 @@ function startPrivatePulseServer(fixture) {
   }
 }
 
+function loadNullSink(env, sinkName = `recappi_extra_sink_${process.pid}_${Date.now()}`) {
+  const moduleId = runCommand('pactl', ['load-module', 'module-null-sink', `sink_name=${sinkName}`], { env })
+
+  return {
+    sinkName,
+    monitorSource: `${sinkName}.monitor`,
+    unload() {
+      try {
+        runCommand('pactl', ['unload-module', moduleId], { env })
+      } catch {
+        // Best-effort test cleanup.
+      }
+    },
+  }
+}
+
+function readModules(env = process.env) {
+  const output = runCommand('pactl', ['list', 'modules'], { env })
+  const sections = output.split(/\n(?=Module #)/)
+
+  return sections
+    .map((section) => {
+      const nameMatch = section.match(/^\s*Name:\s+(.+)$/m)
+      if (!nameMatch) {
+        return null
+      }
+
+      const argumentMatch = section.match(/^\s*Argument:\s*(.*)$/m)
+      return {
+        name: nameMatch[1].trim(),
+        argument: argumentMatch ? argumentMatch[1].trim() : '',
+      }
+    })
+    .filter(Boolean)
+}
+
 function playSineTone(env, sinkName, durationSeconds = 2.5, frequency = 440) {
   const wavPath = join(tmpdir(), `recappi-tone-${process.pid}.wav`)
 
@@ -788,6 +824,8 @@ module.exports = {
   ShareableContent,
   createPrivatePulseFixture,
   getLinuxPlatformCapabilities,
+  loadNullSink,
+  readModules,
   startPrivatePulseServer,
   playSineTone,
   startSineTonePlayer,
