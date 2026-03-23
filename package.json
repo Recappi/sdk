@@ -18,9 +18,6 @@
   "files": [
     "index.cjs",
     "index.d.cts",
-    "linux-shareable-content.cjs",
-    "native.cjs",
-    "native.d.cts",
     "./dist/**/*"
   ],
   "type": "module",
@@ -40,8 +37,8 @@
   "scripts": {
     "artifacts": "napi artifacts",
     "bench": "node --import @oxc-node/core/register benchmark/bench.ts",
-    "build": "napi build --platform --release --js native.cjs --dts native.d.cts",
-    "build:debug": "napi build --platform --js native.cjs --dts native.d.cts",
+    "build": "napi build --platform --release --js index.cjs --dts index.d.cts",
+    "build:debug": "napi build --platform --js index.cjs --dts index.d.cts",
     "build:ts": "tsc",
     "format": "run-p format:js format:rs format:toml",
     "format:js": "vp fmt .",

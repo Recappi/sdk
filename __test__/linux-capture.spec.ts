@@ -9,7 +9,7 @@ import test from 'ava'
 import sdk from '../index.cjs'
 
 const require = createRequire(import.meta.url)
-const linuxBackend = require('../linux-shareable-content.cjs') as {
+const linuxBackend = require('./linux-pulse-fixture.cjs') as {
   createPrivatePulseFixture: () => {
     rootDir: string
     runtimeDir: string
