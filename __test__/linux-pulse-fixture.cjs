@@ -569,6 +569,39 @@ function createPrivatePulseFixture() {
   }
 }
 
+function waitForChildProcess(childProcess, feature, describeFailure, cleanup) {
+  return new Promise((resolve, reject) => {
+    const finishCleanup = () => {
+      cleanup?.()
+    }
+
+    if (childProcess.exitCode !== null) {
+      finishCleanup()
+      if (childProcess.exitCode === 0) {
+        resolve()
+      } else {
+        reject(createLinuxBackendError(feature, describeFailure(childProcess.exitCode)))
+      }
+      return
+    }
+
+    childProcess.once('error', (error) => {
+      finishCleanup()
+      reject(createLinuxBackendError(feature, `Failed to launch ${feature} helper: ${error.message}`))
+    })
+
+    childProcess.once('close', (code) => {
+      finishCleanup()
+      if (code === 0) {
+        resolve()
+        return
+      }
+
+      reject(createLinuxBackendError(feature, describeFailure(code)))
+    })
+  })
+}
+
 function startPrivatePulseServer(fixture) {
   const env = {
     ...process.env,
@@ -656,6 +689,49 @@ function playSineTone(env, sinkName, durationSeconds = 2.5, frequency = 440) {
   }
 }
 
+function startSineTonePlayer(env, sinkName, durationSeconds = 2.5, frequency = 440) {
+  const wavPath = join(tmpdir(), `recappi-tone-${process.pid}-${frequency}-${Date.now()}.wav`)
+
+  runCommand('ffmpeg', [
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-y',
+    '-f',
+    'lavfi',
+    '-i',
+    `sine=frequency=${frequency}:duration=${durationSeconds}:sample_rate=${DEFAULT_SAMPLE_RATE}`,
+    '-ac',
+    '1',
+    wavPath,
+  ])
+
+  const paplayProc = spawn('paplay', ['--device', sinkName, wavPath], {
+    env,
+    stdio: ['ignore', 'ignore', 'pipe'],
+  })
+
+  let stderrBuffer = ''
+  paplayProc.stderr.on('data', (chunk) => {
+    stderrBuffer += String(chunk)
+  })
+
+  return {
+    pid: paplayProc.pid ?? 0,
+    process: paplayProc,
+    wait() {
+      return waitForChildProcess(
+        paplayProc,
+        'ShareableContent.tapAudio',
+        (code) => stderrBuffer.trim() || `paplay exited with ${code}`,
+        () => {
+          rmSync(wavPath, { force: true })
+        },
+      )
+    },
+  }
+}
+
 function startSineToneToSource(
   env,
   pipePath,
@@ -695,30 +771,11 @@ function startSineToneToSource(
   return {
     process: ffmpegProc,
     wait() {
-      return new Promise((resolve, reject) => {
-        ffmpegProc.on('error', (error) => {
-          reject(
-            createLinuxBackendError(
-              'ShareableContent.tapGlobalAudio',
-              `Failed to launch ffmpeg source writer: ${error.message}`,
-            ),
-          )
-        })
-
-        ffmpegProc.on('close', (code) => {
-          if (code === 0) {
-            resolve()
-            return
-          }
-
-          reject(
-            createLinuxBackendError(
-              'ShareableContent.tapGlobalAudio',
-              stderrBuffer.trim() || `ffmpeg source writer exited with ${code}`,
-            ),
-          )
-        })
-      })
+      return waitForChildProcess(
+        ffmpegProc,
+        'ShareableContent.tapGlobalAudio',
+        (code) => stderrBuffer.trim() || `ffmpeg source writer exited with ${code}`,
+      )
     },
   }
 }
@@ -733,6 +790,7 @@ module.exports = {
   getLinuxPlatformCapabilities,
   startPrivatePulseServer,
   playSineTone,
+  startSineTonePlayer,
   startSineToneToSource,
   LINUX_CAPTURE_ERROR_CODE,
 }

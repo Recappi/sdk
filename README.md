@@ -4,16 +4,16 @@
 
 ## Platform support
 
-| Feature                                       | macOS | Windows | Linux (x64 GNU)                   |
-| --------------------------------------------- | ----- | ------- | --------------------------------- |
-| `decodeAudio` / `decodeAudioSync`             | Yes   | Yes     | Yes                               |
-| `ShareableContent.applications()`             | Yes   | Yes     | Yes                               |
-| `ShareableContent.applicationWithProcessId()` | Yes   | Yes     | Yes                               |
-| `ShareableContent.onApplicationListChanged()` | Yes   | Yes     | Yes (polling)                     |
-| `ShareableContent.isUsingMicrophone()`        | Yes   | Yes     | Yes (PulseAudio)                  |
-| `ShareableContent.onAppStateChanged()`        | Yes   | Yes     | Yes (polling)                     |
-| `ShareableContent.tapGlobalAudio()`           | Yes   | Yes     | Yes (PulseAudio monitor)          |
-| `ShareableContent.tapAudio()`                 | Yes   | Yes     | Yes (best-effort global fallback) |
+| Feature                                       | macOS | Windows | Linux (x64 GNU)                    |
+| --------------------------------------------- | ----- | ------- | ---------------------------------- |
+| `decodeAudio` / `decodeAudioSync`             | Yes   | Yes     | Yes                                |
+| `ShareableContent.applications()`             | Yes   | Yes     | Yes                                |
+| `ShareableContent.applicationWithProcessId()` | Yes   | Yes     | Yes                                |
+| `ShareableContent.onApplicationListChanged()` | Yes   | Yes     | Yes (polling)                      |
+| `ShareableContent.isUsingMicrophone()`        | Yes   | Yes     | Yes (PulseAudio)                   |
+| `ShareableContent.onAppStateChanged()`        | Yes   | Yes     | Yes (polling)                      |
+| `ShareableContent.tapGlobalAudio()`           | Yes   | Yes     | Yes (PulseAudio monitor)           |
+| `ShareableContent.tapAudio()`                 | Yes   | Yes     | Yes (dedicated Pulse sink reroute) |
 
 Published Linux artifacts currently target `x86_64-unknown-linux-gnu`. The
 Linux implementation ships the same top-level `ShareableContent` surface as
@@ -118,8 +118,11 @@ for (const app of apps) {
 ### Recording specific application
 
 > Available on macOS, Windows, and Linux.
-> On Linux and Windows, `tapAudio()` currently uses the same capture backend as
+> On Windows, `tapAudio()` currently uses the same capture backend as
 > `tapGlobalAudio()` and does not isolate a single process stream yet.
+> On Linux, `tapAudio()` reroutes matching Pulse sink-inputs into a dedicated
+> capture sink and records that sink's monitor. This is best-effort and depends
+> on the target application exposing movable Pulse streams.
 
 ```typescript
 import { ShareableContent } from '@recappi/sdk'
