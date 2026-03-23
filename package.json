@@ -16,8 +16,8 @@
     "./playground"
   ],
   "files": [
-    "index.cjs",
     "index.d.cts",
+    "index.js",
     "./dist/**/*"
   ],
   "type": "module",
