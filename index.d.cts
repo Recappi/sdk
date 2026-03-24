@@ -40,3 +40,19 @@ export declare function decodeAudio(buf: Uint8Array, destSampleRate?: number | u
 
 /** Decode audio file into a Float32Array */
 export declare function decodeAudioSync(buf: Uint8Array, destSampleRate?: number | undefined | null, filename?: string | undefined | null): Float32Array
+
+export declare function getPlatformCapabilities(): PlatformCapabilities
+
+export interface PlatformCapabilities {
+  platform: string
+  arch: string
+  decodeAudio: boolean
+  decodeAudioSync: boolean
+  applicationListing: boolean
+  applicationLookup: boolean
+  applicationListEvents: boolean
+  applicationStateEvents: boolean
+  microphoneState: boolean
+  tapAudio: boolean
+  tapGlobalAudio: boolean
+}

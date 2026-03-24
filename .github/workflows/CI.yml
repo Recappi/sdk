@@ -52,6 +52,35 @@ jobs:
 
       - name: Clippy
         run: cargo clippy
+  cargo-test:
+    name: Cargo test on ${{ matrix.host }}
+    strategy:
+      fail-fast: false
+      matrix:
+        host:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    runs-on: ${{ matrix.host }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: Cache cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: cargo-test-${{ matrix.host }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-test-${{ matrix.host }}-
+      - name: Run cargo test
+        run: cargo test
   build:
     strategy:
       fail-fast: false
@@ -60,6 +89,9 @@ jobs:
           - host: macos-latest
             target: x86_64-apple-darwin
             build: yarn build --target x86_64-apple-darwin
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            build: yarn build --target x86_64-unknown-linux-gnu
           - host: windows-latest
             build: yarn build --target x86_64-pc-windows-msvc
             target: x86_64-pc-windows-msvc
@@ -96,7 +128,9 @@ jobs:
             ~/.napi-rs
             .cargo-cache
             target/
-          key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}
+          key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}-
       - uses: mlugg/setup-zig@v2
         if: ${{ contains(matrix.settings.target, 'musl') }}
         with:
@@ -125,7 +159,7 @@ jobs:
             ${{ env.APP_NAME }}.*.node
           if-no-files-found: error
 
-  test-macOS-windows-binding:
+  test-bindings:
     name: Test bindings on ${{ matrix.settings.target }} - node@${{ matrix.node }}
     needs:
       - build
@@ -133,6 +167,9 @@ jobs:
       fail-fast: false
       matrix:
         settings:
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            architecture: x64
           - host: windows-latest
             target: x86_64-pc-windows-msvc
             architecture: x64
@@ -148,7 +185,6 @@ jobs:
         node:
           - '20'
           - '22'
-          - '22'
     runs-on: ${{ matrix.settings.host }}
     steps:
       - uses: actions/checkout@v6
@@ -158,6 +194,11 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: yarn
           architecture: ${{ matrix.settings.architecture }}
+      - name: Install Linux audio tools
+        if: ${{ matrix.settings.host == 'ubuntu-latest' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg pulseaudio pulseaudio-utils
       - name: Install dependencies
         run: yarn install
       - name: Download artifacts
@@ -179,7 +220,8 @@ jobs:
       id-token: write
     needs:
       - lint
-      - test-macOS-windows-binding
+      - cargo-test
+      - test-bindings
     steps:
       - uses: actions/checkout@v6
       - name: Setup node

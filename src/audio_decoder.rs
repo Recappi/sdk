@@ -185,3 +185,79 @@ pub fn decode_audio(
     signal,
   )
 }
+
+#[cfg(test)]
+mod tests {
+  use super::decode;
+
+  fn create_pcm_wav(samples: &[i16], channels: u16, sample_rate: u32) -> Vec<u8> {
+    let bits_per_sample = 16u16;
+    let block_align = channels * (bits_per_sample / 8);
+    let byte_rate = sample_rate * u32::from(block_align);
+    let data_size = std::mem::size_of_val(samples) as u32;
+    let riff_chunk_size = 36 + data_size;
+
+    let mut wav = Vec::with_capacity((44 + data_size) as usize);
+    wav.extend_from_slice(b"RIFF");
+    wav.extend_from_slice(&riff_chunk_size.to_le_bytes());
+    wav.extend_from_slice(b"WAVE");
+    wav.extend_from_slice(b"fmt ");
+    wav.extend_from_slice(&16u32.to_le_bytes());
+    wav.extend_from_slice(&1u16.to_le_bytes());
+    wav.extend_from_slice(&channels.to_le_bytes());
+    wav.extend_from_slice(&sample_rate.to_le_bytes());
+    wav.extend_from_slice(&byte_rate.to_le_bytes());
+    wav.extend_from_slice(&block_align.to_le_bytes());
+    wav.extend_from_slice(&bits_per_sample.to_le_bytes());
+    wav.extend_from_slice(b"data");
+    wav.extend_from_slice(&data_size.to_le_bytes());
+    for sample in samples {
+      wav.extend_from_slice(&sample.to_le_bytes());
+    }
+
+    wav
+  }
+
+  fn assert_close(actual: f32, expected: f32, tolerance: f32) {
+    assert!(
+      (actual - expected).abs() <= tolerance,
+      "expected {expected}, got {actual} (tolerance {tolerance})"
+    );
+  }
+
+  #[test]
+  fn test_decode_stereo_wav_mixes_channels_to_mono() {
+    let wav = create_pcm_wav(
+      &[
+        8192, 8192, // 0.25 + 0.25 -> 0.25
+        16384, 0, // 0.5 + 0.0 -> 0.25
+        0, 0, // silence
+      ],
+      2,
+      48_000,
+    );
+
+    let decoded = decode(wav, None, Some("fixture.wav")).expect("decode should succeed");
+
+    assert_eq!(decoded.len(), 3);
+    assert_close(decoded[0], 0.25, 0.01);
+    assert_close(decoded[1], 0.25, 0.01);
+    assert_close(decoded[2], 0.0, 0.001);
+  }
+
+  #[test]
+  fn test_decode_resamples_when_destination_sample_rate_changes() {
+    let input = vec![4096i16; 480];
+    let wav = create_pcm_wav(&input, 1, 48_000);
+
+    let decoded =
+      decode(wav, Some(24_000), Some("fixture.wav")).expect("decode with resample should succeed");
+
+    assert!(
+      (decoded.len() as isize - 240).abs() <= 2,
+      "expected decoded length to be close to 240, got {}",
+      decoded.len()
+    );
+    assert_close(decoded[decoded.len() / 2], 0.125, 0.05);
+  }
+}

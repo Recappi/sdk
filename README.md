@@ -2,9 +2,48 @@
 
 [![CI](https://github.com/Recappi/sdk/actions/workflows/CI.yml/badge.svg)](https://github.com/Recappi/sdk/actions/workflows/CI.yml)
 
+## Platform support
+
+| Feature                                       | macOS | Windows | Linux (x64 GNU)                    |
+| --------------------------------------------- | ----- | ------- | ---------------------------------- |
+| `decodeAudio` / `decodeAudioSync`             | Yes   | Yes     | Yes                                |
+| `ShareableContent.applications()`             | Yes   | Yes     | Yes                                |
+| `ShareableContent.applicationWithProcessId()` | Yes   | Yes     | Yes                                |
+| `ShareableContent.onApplicationListChanged()` | Yes   | Yes     | Yes (polling)                      |
+| `ShareableContent.isUsingMicrophone()`        | Yes   | Yes     | Yes (PulseAudio)                   |
+| `ShareableContent.onAppStateChanged()`        | Yes   | Yes     | Yes (polling)                      |
+| `ShareableContent.tapGlobalAudio()`           | Yes   | Yes     | Yes (PulseAudio monitor)           |
+| `ShareableContent.tapAudio()`                 | Yes   | Yes     | Yes (dedicated Pulse sink reroute) |
+
+Published Linux artifacts currently target `x86_64-unknown-linux-gnu`. The
+Linux implementation ships the same top-level `ShareableContent` surface as
+macOS and Windows, but it uses a PulseAudio-compatible userspace and shells out
+to `pactl` / `ffmpeg`, so capture requires those tools to be available at
+runtime.
+
+If your application needs to choose a Linux fallback backend dynamically, use
+`getPlatformCapabilities()` instead of hard-coding platform checks. On Linux,
+those booleans reflect the currently reachable runtime prerequisites for each
+capture path, not just whether the functions are exported.
+
+```typescript
+import { getPlatformCapabilities } from '@recappi/sdk'
+
+const capabilities = getPlatformCapabilities()
+
+if (capabilities.tapGlobalAudio) {
+  console.log('Use Recappi for realtime capture')
+} else {
+  console.log('Use your Linux-specific fallback backend')
+}
+```
+
 ## Usage
 
 ### Recording system audio
+
+> Available on macOS, Windows, and Linux. Linux capture requires a
+> PulseAudio-compatible server plus `pactl` and `ffmpeg`.
 
 Both input and output devices are recording, mixed into a single audio stream.
 
@@ -64,6 +103,8 @@ await writeFile('output.wav', wavBuffer)
 
 ### Listing running applications
 
+> Available on macOS, Windows, and Linux.
+
 ```typescript
 import { ShareableContent } from '@recappi/sdk'
 
@@ -75,6 +116,13 @@ for (const app of apps) {
 ```
 
 ### Recording specific application
+
+> Available on macOS, Windows, and Linux.
+> On Windows, `tapAudio()` currently uses the same capture backend as
+> `tapGlobalAudio()` and does not isolate a single process stream yet.
+> On Linux, `tapAudio()` reroutes matching Pulse sink-inputs into a dedicated
+> capture sink and records that sink's monitor. This is best-effort and depends
+> on the target application exposing movable Pulse streams.
 
 ```typescript
 import { ShareableContent } from '@recappi/sdk'
@@ -106,3 +154,21 @@ yarn build
 yarn workspace playground dev:server
 yarn workspace playground dev:web
 ```
+
+## Local Linux Iteration From macOS
+
+Use the bundled Docker environment to exercise the Linux backend locally from a
+macOS workstation.
+
+```sh
+bash ./scripts/test-linux-docker.sh
+```
+
+If you want an interactive shell inside the same Linux image:
+
+```sh
+bash ./scripts/docker-linux.sh bash
+```
+
+The Docker image installs Rust, Node.js, PulseAudio, `pactl`, and `ffmpeg`, so
+the Linux binding tests can run without depending on the host machine.
