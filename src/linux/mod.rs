@@ -26,6 +26,8 @@ const POLL_INTERVAL: Duration = Duration::from_millis(1_000);
 const PROCESS_REROUTE_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const CAPTURE_FEATURE: &str = "ShareableContent.tapGlobalAudio";
 const PROCESS_CAPTURE_FEATURE: &str = "ShareableContent.tapAudio";
+const APPLICATION_STATE_FEATURE: &str = "ShareableContent.onAppStateChanged";
+const MICROPHONE_FEATURE: &str = "ShareableContent.isUsingMicrophone";
 static CAPTURE_SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy)]
@@ -118,7 +120,7 @@ fn run_command(command: &str, args: &[&str], feature: &str) -> Result<String> {
   let output = Command::new(command).args(args).output().map_err(|err| {
     linux_backend_error(
       feature,
-      format!(r#"Failed to start "{command} {}": {err}"#, args.join(" ")),
+      format!("Failed to start \"{command} {}\": {err}", args.join(" ")),
     )
   })?;
 
@@ -203,8 +205,8 @@ fn read_executable_path(process_id: i32) -> String {
     .unwrap_or_default()
 }
 
-fn read_pulse_info() -> Result<PulseInfo> {
-  let output = run_command("pactl", &["info"], CAPTURE_FEATURE)?;
+fn read_pulse_info(feature: &str) -> Result<PulseInfo> {
+  let output = run_command("pactl", &["info"], feature)?;
   let mut default_sink = String::new();
   let mut default_source = String::new();
 
@@ -262,8 +264,8 @@ fn extract_quoted_property(section: &str, key: &str) -> Option<String> {
   Some(value[..end].to_owned())
 }
 
-fn read_source_outputs() -> Result<Vec<SourceOutputInfo>> {
-  let output = run_command("pactl", &["list", "source-outputs"], CAPTURE_FEATURE)?;
+fn read_source_outputs(feature: &str) -> Result<Vec<SourceOutputInfo>> {
+  let output = run_command("pactl", &["list", "source-outputs"], feature)?;
 
   Ok(
     split_sections(&output, "Source Output #")
@@ -341,8 +343,8 @@ fn read_sink_inputs(feature: &str) -> Result<Vec<SinkInputInfo>> {
   )
 }
 
-fn read_sources() -> Result<Vec<SourceInfo>> {
-  let output = run_command("pactl", &["list", "sources"], CAPTURE_FEATURE)?;
+fn read_sources(feature: &str) -> Result<Vec<SourceInfo>> {
+  let output = run_command("pactl", &["list", "sources"], feature)?;
 
   Ok(
     split_sections(&output, "Source #")
@@ -375,15 +377,15 @@ fn is_monitor_source(source: &SourceInfo) -> bool {
     || (!source.monitor_of_sink.is_empty() && source.monitor_of_sink != "n/a")
 }
 
-fn read_active_microphone_process_ids() -> Result<HashSet<i32>> {
-  let monitor_source_ids = read_sources()?
+fn read_active_microphone_process_ids(feature: &str) -> Result<HashSet<i32>> {
+  let monitor_source_ids = read_sources(feature)?
     .into_iter()
     .filter(is_monitor_source)
     .map(|source| source.index)
     .collect::<HashSet<_>>();
 
   let mut active_processes = HashSet::new();
-  for source_output in read_source_outputs()? {
+  for source_output in read_source_outputs(feature)? {
     if let Some(source_id) = source_output.source_id
       && monitor_source_ids.contains(&source_id)
     {
@@ -396,11 +398,15 @@ fn read_active_microphone_process_ids() -> Result<HashSet<i32>> {
   Ok(active_processes)
 }
 
-fn can_read_pulse_info() -> bool {
-  read_pulse_info().is_ok()
+fn is_process_using_microphone(process_id: i32, feature: &str) -> Result<bool> {
+  Ok(read_active_microphone_process_ids(feature)?.contains(&process_id))
 }
 
-fn resolve_monitor_source() -> Result<String> {
+fn can_read_pulse_info() -> bool {
+  read_pulse_info(CAPTURE_FEATURE).is_ok()
+}
+
+fn resolve_monitor_source(feature: &str) -> Result<String> {
   if let Ok(source) = env::var("RECAPPI_PULSE_MONITOR_SOURCE") {
     let trimmed = source.trim();
     if !trimmed.is_empty() {
@@ -408,10 +414,10 @@ fn resolve_monitor_source() -> Result<String> {
     }
   }
 
-  let pulse_info = read_pulse_info()?;
+  let pulse_info = read_pulse_info(feature)?;
   if pulse_info.default_sink.is_empty() {
     return Err(linux_backend_error(
-      CAPTURE_FEATURE,
+      feature,
       "PulseAudio did not report a default sink.",
     ));
   }
@@ -419,7 +425,7 @@ fn resolve_monitor_source() -> Result<String> {
   Ok(format!("{}.monitor", pulse_info.default_sink))
 }
 
-fn resolve_microphone_source() -> Result<String> {
+fn resolve_microphone_source(feature: &str) -> Result<String> {
   if let Ok(source) = env::var("RECAPPI_PULSE_SOURCE") {
     let trimmed = source.trim();
     if !trimmed.is_empty() {
@@ -427,11 +433,11 @@ fn resolve_microphone_source() -> Result<String> {
     }
   }
 
-  Ok(read_pulse_info()?.default_source)
+  Ok(read_pulse_info(feature)?.default_source)
 }
 
 fn can_resolve_monitor_source() -> bool {
-  resolve_monitor_source().is_ok()
+  resolve_monitor_source(CAPTURE_FEATURE).is_ok()
 }
 
 fn pulseaudio_dump_modules_contains(module_name: &str) -> bool {
@@ -525,12 +531,12 @@ fn is_loopback_sink_input(sink_input: &SinkInputInfo) -> bool {
   sink_input.driver == "module-loopback.c" || sink_input.media_name.starts_with("Loopback from ")
 }
 
-fn move_sink_input(index: u32, sink: &str) -> Result<()> {
+fn move_sink_input(index: u32, sink: &str, feature: &str) -> Result<()> {
   let index_arg = index.to_string();
   run_command(
     "pactl",
     &["move-sink-input", index_arg.as_str(), sink],
-    PROCESS_CAPTURE_FEATURE,
+    feature,
   )?;
   Ok(())
 }
@@ -566,7 +572,7 @@ fn unload_module(module_id: &str, feature: &str) {
 }
 
 fn resolve_monitor_sink_name() -> Result<String> {
-  let monitor_source = resolve_monitor_source()?;
+  let monitor_source = resolve_monitor_source(CAPTURE_FEATURE)?;
   if let Some(sink_name) = monitor_source.strip_suffix(".monitor") {
     return Ok(sink_name.to_owned());
   }
@@ -586,6 +592,7 @@ fn can_probe_process_capture_route() -> bool {
 fn restore_moved_sink_inputs(
   moved_inputs: &Arc<Mutex<HashMap<u32, String>>>,
   fallback_sink: Option<&str>,
+  feature: &str,
 ) {
   let moved_inputs = moved_inputs
     .lock()
@@ -600,7 +607,7 @@ fn restore_moved_sink_inputs(
     };
 
     if let Some(restore_sink) = restore_sink {
-      let _ = move_sink_input(input_index, restore_sink);
+      let _ = move_sink_input(input_index, restore_sink, feature);
     }
   }
 }
@@ -610,7 +617,7 @@ fn cleanup_process_start_failure(
   loopback_route: &Arc<Mutex<Option<LoopbackRoute>>>,
   sink_module_id: &str,
 ) {
-  restore_moved_sink_inputs(moved_inputs, None);
+  restore_moved_sink_inputs(moved_inputs, None, PROCESS_CAPTURE_FEATURE);
 
   if let Ok(mut loopback_route) = loopback_route.lock()
     && let Some(route) = loopback_route.take()
@@ -627,7 +634,7 @@ fn cleanup_global_start_failure(
   sink_module_id: &str,
   fallback_sink: &str,
 ) {
-  restore_moved_sink_inputs(moved_inputs, Some(fallback_sink));
+  restore_moved_sink_inputs(moved_inputs, Some(fallback_sink), CAPTURE_FEATURE);
   unload_module(loopback_module_id, CAPTURE_FEATURE);
   unload_module(sink_module_id, CAPTURE_FEATURE);
 }
@@ -652,7 +659,7 @@ fn reroute_global_sink_inputs(
       continue;
     }
 
-    move_sink_input(sink_input.index, capture_sink)?;
+    move_sink_input(sink_input.index, capture_sink, CAPTURE_FEATURE)?;
     if let Ok(mut moved_inputs) = moved_inputs.lock() {
       moved_inputs
         .entry(sink_input.index)
@@ -668,12 +675,26 @@ fn ensure_process_loopback(
   source_sink: &str,
   loopback_route: &Arc<Mutex<Option<LoopbackRoute>>>,
 ) -> Result<bool> {
-  let mut loopback_route = loopback_route
-    .lock()
-    .map_err(|_| linux_backend_error(PROCESS_CAPTURE_FEATURE, "Loopback state was poisoned."))?;
+  let existing_module_id = {
+    let mut loopback_route = loopback_route
+      .lock()
+      .map_err(|_| linux_backend_error(PROCESS_CAPTURE_FEATURE, "Loopback state was poisoned."))?;
 
-  if let Some(existing) = loopback_route.as_ref() {
-    return Ok(existing.sink == source_sink);
+    if let Some(existing) = loopback_route.as_ref() {
+      if existing.sink == source_sink {
+        return Ok(true);
+      }
+
+      let module_id = existing.module_id.clone();
+      *loopback_route = None;
+      Some(module_id)
+    } else {
+      None
+    }
+  };
+
+  if let Some(existing_module_id) = existing_module_id {
+    unload_module(&existing_module_id, PROCESS_CAPTURE_FEATURE);
   }
 
   let module_id = create_loopback(
@@ -681,6 +702,10 @@ fn ensure_process_loopback(
     source_sink,
     PROCESS_CAPTURE_FEATURE,
   )?;
+
+  let mut loopback_route = loopback_route
+    .lock()
+    .map_err(|_| linux_backend_error(PROCESS_CAPTURE_FEATURE, "Loopback state was poisoned."))?;
   *loopback_route = Some(LoopbackRoute {
     module_id,
     sink: source_sink.to_owned(),
@@ -704,7 +729,7 @@ fn reroute_process_sink_inputs(
       continue;
     }
 
-    move_sink_input(sink_input.index, capture_sink)?;
+    move_sink_input(sink_input.index, capture_sink, PROCESS_CAPTURE_FEATURE)?;
     if let Ok(mut moved_inputs) = moved_inputs.lock() {
       moved_inputs
         .entry(sink_input.index)
@@ -717,7 +742,7 @@ fn reroute_process_sink_inputs(
 
 impl ProcessTapRouting {
   fn start(process_id: i32) -> Result<Self> {
-    let pulse_info = read_pulse_info()?;
+    let pulse_info = read_pulse_info(PROCESS_CAPTURE_FEATURE)?;
     if pulse_info.default_sink.is_empty() {
       return Err(linux_backend_error(
         PROCESS_CAPTURE_FEATURE,
@@ -784,7 +809,7 @@ impl ProcessTapRouting {
       .unwrap_or_default();
     for (input_index, original_sink) in moved_inputs {
       if !original_sink.is_empty() {
-        let _ = move_sink_input(input_index, &original_sink);
+        let _ = move_sink_input(input_index, &original_sink, PROCESS_CAPTURE_FEATURE);
       }
     }
 
@@ -802,7 +827,7 @@ impl Drop for ProcessTapRouting {
 
 impl GlobalExcludedTapRouting {
   fn start(excluded_process_ids: HashSet<i32>) -> Result<Self> {
-    let pulse_info = read_pulse_info()?;
+    let pulse_info = read_pulse_info(CAPTURE_FEATURE)?;
     let target_sink = resolve_monitor_sink_name()?;
     if pulse_info.default_sink.is_empty() || target_sink.is_empty() {
       return Err(linux_backend_error(
@@ -890,7 +915,7 @@ impl GlobalExcludedTapRouting {
       } else {
         original_sink.as_str()
       };
-      let _ = move_sink_input(input_index, restore_sink);
+      let _ = move_sink_input(input_index, restore_sink, CAPTURE_FEATURE);
     }
 
     if let Some(sink_module_id) = self.sink_module_id.take() {
@@ -990,8 +1015,8 @@ fn build_capture_args_for_sources(
 }
 
 fn build_capture_args() -> Result<Vec<String>> {
-  let monitor_source = resolve_monitor_source()?;
-  let microphone_source = resolve_microphone_source()?;
+  let monitor_source = resolve_monitor_source(CAPTURE_FEATURE)?;
+  let microphone_source = resolve_microphone_source(CAPTURE_FEATURE)?;
 
   Ok(build_capture_args_for_sources(
     &mut vec![monitor_source],
@@ -1185,7 +1210,7 @@ fn start_global_recording_with_exclusions(
   audio_stream_callback: ThreadsafeFunction<Float32Array, ()>,
 ) -> Result<AudioCaptureSession> {
   let routing = GlobalExcludedTapRouting::start(excluded_process_ids)?;
-  let microphone_source = resolve_microphone_source()?;
+  let microphone_source = resolve_microphone_source(CAPTURE_FEATURE)?;
   let mut monitor_sources = vec![format!("{}.monitor", routing.capture_sink)];
   let ffmpeg_args = build_capture_args_for_sources(&mut monitor_sources, Some(microphone_source));
   start_recording_with_args(
@@ -1435,14 +1460,14 @@ impl ShareableContent {
     let process_id = app.process_id as u32;
 
     thread::spawn(move || {
-      let mut previous_is_using_microphone = match ShareableContent::is_using_microphone(process_id)
-      {
-        Ok(is_using_microphone) => is_using_microphone,
-        Err(err) => {
-          let _ = callback_for_thread.call(Err(err), ThreadsafeFunctionCallMode::NonBlocking);
-          false
-        }
-      };
+      let mut previous_is_using_microphone =
+        match is_process_using_microphone(process_id as i32, APPLICATION_STATE_FEATURE) {
+          Ok(is_using_microphone) => is_using_microphone,
+          Err(err) => {
+            let _ = callback_for_thread.call(Err(err), ThreadsafeFunctionCallMode::NonBlocking);
+            false
+          }
+        };
 
       while !stop_flag_for_thread.load(Ordering::Relaxed) {
         thread::sleep(POLL_INTERVAL);
@@ -1450,7 +1475,7 @@ impl ShareableContent {
           break;
         }
 
-        match ShareableContent::is_using_microphone(process_id) {
+        match is_process_using_microphone(process_id as i32, APPLICATION_STATE_FEATURE) {
           Ok(current_is_using_microphone) => {
             if current_is_using_microphone != previous_is_using_microphone {
               previous_is_using_microphone = current_is_using_microphone;
@@ -1490,7 +1515,7 @@ impl ShareableContent {
 
   #[napi]
   pub fn is_using_microphone(process_id: u32) -> Result<bool> {
-    Ok(read_active_microphone_process_ids()?.contains(&(process_id as i32)))
+    is_process_using_microphone(process_id as i32, MICROPHONE_FEATURE)
   }
 
   #[napi]

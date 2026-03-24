@@ -17,7 +17,6 @@
   ],
   "files": [
     "index.d.cts",
-    "index.js",
     "./dist/**/*"
   ],
   "type": "module",
