@@ -11,7 +11,6 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-audioadapter-buffers = "2.0"
 napi = "3.0.0"
 napi-derive = "3.0.0"
 rubato = "1.0"
