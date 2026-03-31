@@ -583,3 +583,4 @@ module.exports.AudioCaptureSession = nativeBinding.AudioCaptureSession
 module.exports.ShareableContent = nativeBinding.ShareableContent
 module.exports.decodeAudio = nativeBinding.decodeAudio
 module.exports.decodeAudioSync = nativeBinding.decodeAudioSync
+module.exports.getPlatformCapabilities = nativeBinding.getPlatformCapabilities
