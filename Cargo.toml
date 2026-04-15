@@ -11,10 +11,10 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-audioadapter-buffers = "2.0"
+audioadapter-buffers = "3.0"
 napi = "3.0.0"
 napi-derive = "3.0.0"
-rubato = "1.0"
+rubato = "2.0"
 symphonia = { version = "0.5", features = ["all", "opt-simd"] }
 thiserror = "2"
 
