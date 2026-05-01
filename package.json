@@ -54,7 +54,7 @@
     "@napi-rs/cli": "^3.5.1",
     "@oxc-node/core": "^0.1.0",
     "@types/node": "^25.5.0",
-    "ava": "^7.0.0",
+    "ava": "^8.0.0",
     "npm-run-all2": "^8.0.4",
     "oxlint-tsgolint": "^0.21.0",
     "prettier": "^3.8.1",
