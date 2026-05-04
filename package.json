@@ -81,9 +81,9 @@
     "environmentVariables": {
       "OXC_TSCONFIG_PATH": "./__test__/tsconfig.json"
     },
-    "extensions": {
-      "ts": "module"
-    },
+    "extensions": [
+      "ts"
+    ],
     "nodeArguments": [
       "--import",
       "@oxc-node/core/register"
@@ -92,7 +92,7 @@
     "workerThreads": false
   },
   "engines": {
-    "node": ">= 20.19.0"
+    "node": ">= 22.0.0"
   },
   "packageManager": "yarn@4.14.1"
 }
