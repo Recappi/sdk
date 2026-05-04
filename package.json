@@ -54,7 +54,7 @@
     "@napi-rs/cli": "^3.5.1",
     "@oxc-node/core": "^0.1.0",
     "@types/node": "^25.5.0",
-    "ava": "^7.0.0",
+    "ava": "^8.0.0",
     "npm-run-all2": "^8.0.4",
     "oxlint-tsgolint": "^0.22.0",
     "prettier": "^3.8.1",
@@ -81,9 +81,9 @@
     "environmentVariables": {
       "OXC_TSCONFIG_PATH": "./__test__/tsconfig.json"
     },
-    "extensions": {
-      "ts": "module"
-    },
+    "extensions": [
+      "ts"
+    ],
     "nodeArguments": [
       "--import",
       "@oxc-node/core/register"
@@ -92,7 +92,7 @@
     "workerThreads": false
   },
   "engines": {
-    "node": ">= 20.19.0"
+    "node": ">= 22.0.0"
   },
   "packageManager": "yarn@4.14.1"
 }
