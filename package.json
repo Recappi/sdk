@@ -55,7 +55,7 @@
     "@oxc-node/core": "^0.1.0",
     "@types/node": "^25.5.0",
     "ava": "^8.0.0",
-    "npm-run-all2": "^8.0.4",
+    "npm-run-all2": "^9.0.0",
     "oxlint-tsgolint": "^0.22.0",
     "prettier": "^3.8.1",
     "tinybench": "^6.0.0",
