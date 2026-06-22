@@ -275,7 +275,7 @@ pub fn start_recording(
   // Build microphone input stream
   let mic_stream = mic
     .build_input_stream(
-      &mic_stream_config,
+      mic_stream_config,
       move |data: &[f32], _| {
         let _ = tx_mic.send(AudioBuffer {
           data: data.to_vec(),
@@ -290,7 +290,7 @@ pub fn start_recording(
   // supports this)
   let lb_stream = loopback_device
     .build_input_stream(
-      &lb_stream_config,
+      lb_stream_config,
       move |data: &[f32], _| {
         let _ = tx_lb.send(AudioBuffer {
           data: data.to_vec(),
