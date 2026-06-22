@@ -81,11 +81,10 @@ fn decode<B: AsRef<[u8]> + Send + Sync + 'static>(
       continue;
     }
 
-    let decoded = match decoder.decode(&packet) {
-      Ok(decoded) => decoded,
-      Err(Error::IoError(_)) | Err(Error::DecodeError(_)) => continue,
-      Err(err) => return Err(err),
-    };
+    // Abort on any decode error (matches the pre-0.6 `decoder.decode(&packet)?`
+    // behavior). A corrupt or truncated stream must fail loudly rather than
+    // silently returning partial/empty PCM.
+    let decoded = decoder.decode(&packet)?;
 
     let channels = decoded.spec().channels().count();
 
