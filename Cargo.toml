@@ -12,10 +12,10 @@ crate-type = ["cdylib"]
 
 [dependencies]
 audioadapter-buffers = "3.0"
-napi = "3.0.0"
-napi-derive = "3.0.0"
-rubato = "2.0"
-symphonia = { version = "0.5", features = ["all", "opt-simd"] }
+napi = "3.9"
+napi-derive = "3.5"
+rubato = "3.0"
+symphonia = { version = "0.6", features = ["all", "opt-simd"] }
 thiserror = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -29,11 +29,11 @@ objc2-core-audio = "0.3"
 objc2-core-audio-types = "0.3"
 objc2-core-foundation = "0.3"
 objc2-foundation = "0.3"
-screencapturekit = "3.0"
+screencapturekit = "8.0"
 uuid = { version = "1", features = ["v4"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-cpal = "0.17"
+cpal = "0.18"
 crossbeam-channel = "0.5"
 windows = { version = "0.62", features = [
   "Win32_Devices_FunctionDiscovery",
