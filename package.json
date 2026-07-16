@@ -59,7 +59,7 @@
     "oxlint-tsgolint": "^0.24.0",
     "prettier": "^3.8.4",
     "tinybench": "^6.0.2",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.0",
     "vite-plus": "catalog:"
   },
   "resolutions": {
