@@ -14,7 +14,7 @@ crate-type = ["cdylib"]
 audioadapter-buffers = "4.0"
 napi = "3.9"
 napi-derive = "3.5"
-rubato = "4.0"
+rubato = "5.0"
 symphonia = { version = "0.6", features = ["all", "opt-simd"] }
 thiserror = "2"
 
