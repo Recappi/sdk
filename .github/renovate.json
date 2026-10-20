@@ -9,6 +9,10 @@
       "groupName": "napi-rs"
     },
     {
+      "matchPackageNames": ["windows", "windows-core"],
+      "groupName": "windows-rs"
+    },
+    {
       "matchPackagePatterns": ["^eslint", "^@typescript-eslint"],
       "groupName": "linter"
     }
