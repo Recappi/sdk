@@ -9,7 +9,7 @@
   },
   "devDependencies": {
     "@google/genai": "^2.0.0",
-    "@oxc-node/cli": "^0.1.0",
+    "@oxc-node/cli": "^1.0.0",
     "@oxc-node/core": "^0.1.0",
     "@recappi/sdk": "workspace:*",
     "@tailwindcss/vite": "^4.2.1",
