@@ -47,7 +47,8 @@ windows = { version = "0.62", features = [
   "Win32_System_Variant",
   "Win32_UI_Shell_PropertiesSystem",
 ] }
-windows-core = { version = "0.100" }
+# Required by #[implement]; must match the windows crate's COM types.
+windows-core = { version = "0.62" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
