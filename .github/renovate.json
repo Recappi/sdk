@@ -13,6 +13,12 @@
       "groupName": "windows-rs"
     },
     {
+      "description": "windows 0.62 requires windows-core 0.62 for COM implementations; update this bound when upgrading windows.",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["windows-core"],
+      "allowedVersions": "<0.63"
+    },
+    {
       "matchPackagePatterns": ["^eslint", "^@typescript-eslint"],
       "groupName": "linter"
     },
