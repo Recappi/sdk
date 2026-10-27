@@ -15,6 +15,13 @@
     {
       "matchPackagePatterns": ["^eslint", "^@typescript-eslint"],
       "groupName": "linter"
+    },
+    {
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["@oxc-node/*"],
+      "groupName": "oxc-node",
+      "groupSlug": "oxc-node",
+      "separateMajorMinor": false
     }
   ],
   "commitMessagePrefix": "chore: ",
