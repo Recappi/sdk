@@ -1,4 +1,4 @@
-FROM docker.io/library/node:24-bookworm
+FROM docker.io/library/node:26-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV CARGO_HOME=/usr/local/cargo
