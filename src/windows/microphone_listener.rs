@@ -12,25 +12,25 @@ use napi::{
   Result,
   threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode},
 };
-use windows::{
-  Win32::{
-    Foundation::CloseHandle,
-    Media::Audio::{
-      AudioSessionState, AudioSessionStateActive, DEVICE_STATE_ACTIVE, IAudioSessionControl,
-      IAudioSessionControl2, IAudioSessionEnumerator, IAudioSessionEvents,
-      IAudioSessionEvents_Impl, IAudioSessionManager2, IAudioSessionNotification,
-      IAudioSessionNotification_Impl, IMMDevice, IMMDeviceCollection, IMMDeviceEnumerator,
-      MMDeviceEnumerator, eCapture, eCommunications, eConsole,
-    },
-    System::{
-      Com::{CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx},
-      ProcessStatus::{GetModuleFileNameExW, GetProcessImageFileNameW},
-      Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ},
-    },
+use windows::Win32::{
+  Foundation::CloseHandle,
+  System::{
+    ProcessStatus::{GetModuleFileNameExW, GetProcessImageFileNameW},
+    Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ},
   },
-  core::Interface,
 };
-use windows_core::implement;
+use windows_core::{Interface, implement};
+
+// Keep all audio COM values on windows-core 0.100. The windows crate's process
+// APIs use their own core types, which never cross this boundary.
+use super::audio_bindings::{
+  AudioSessionDisconnectReason, AudioSessionState, AudioSessionStateActive, CLSCTX_ALL,
+  COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, DEVICE_STATE_ACTIVE,
+  IAudioSessionControl, IAudioSessionControl2, IAudioSessionEnumerator, IAudioSessionEvents,
+  IAudioSessionEvents_Impl, IAudioSessionManager2, IAudioSessionNotification,
+  IAudioSessionNotification_Impl, IMMDevice, IMMDeviceCollection, IMMDeviceEnumerator,
+  MMDeviceEnumerator, eCapture, eCommunications, eConsole,
+};
 
 pub struct AudioProcess {
   pub process_name: String,
@@ -107,10 +107,10 @@ impl IAudioSessionEvents_Impl for SessionEvents_Impl {
 
   fn OnSessionDisconnected(
     &self,
-    _disconnectreason: windows::Win32::Media::Audio::AudioSessionDisconnectReason,
+    _disconnectreason: AudioSessionDisconnectReason,
   ) -> windows_core::Result<()> {
     if let Some(events) = self.events_ref.lock().unwrap().take() {
-      unsafe { self.ctrl.UnregisterAudioSessionNotification(&events)? };
+      unsafe { self.ctrl.UnregisterAudioSessionNotification(&events).ok()? };
     }
 
     // If this session was active, decrement the global counter
@@ -263,7 +263,7 @@ impl SessionNotifier {
         .into();
         let mut events_mut_ref = events_ref.lock().unwrap();
         *events_mut_ref = Some(events.clone());
-        unsafe { ctrl.RegisterAudioSessionNotification(&events)? };
+        unsafe { ctrl.RegisterAudioSessionNotification(&events).ok()? };
         // keep the ctrl2 alive so that the notification can be called
         *optional_ctrl = Some((ctrl2, events));
 
@@ -290,7 +290,7 @@ impl SessionNotifier {
 impl IAudioSessionNotification_Impl for SessionNotifier_Impl {
   fn OnSessionCreated(
     &self,
-    ctrl_ref: windows_core::Ref<'_, windows::Win32::Media::Audio::IAudioSessionControl>,
+    ctrl_ref: windows_core::Ref<'_, IAudioSessionControl>,
   ) -> windows_core::Result<()> {
     let Some(ctrl) = ctrl_ref.as_ref() else {
       return Ok(());
@@ -306,11 +306,12 @@ pub fn register_audio_device_status_callback(
   callback: Arc<ThreadsafeFunction<(bool, String, String, String)>>,
 ) -> windows_core::Result<Vec<IAudioSessionNotification>> {
   unsafe {
-    let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
+    let enumerator: IMMDeviceEnumerator =
+      CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL as u32)?;
 
     // Get all active capture devices
     let device_collection: IMMDeviceCollection =
-      enumerator.EnumAudioEndpoints(eCapture, DEVICE_STATE_ACTIVE)?;
+      enumerator.EnumAudioEndpoints(eCapture, DEVICE_STATE_ACTIVE as u32)?;
 
     let device_count = device_collection.GetCount()?;
     let mut session_notifiers = Vec::new();
@@ -324,7 +325,7 @@ pub fn register_audio_device_status_callback(
       let device_name = format!("Audio Device {}", i);
 
       // Activate session manager for this device
-      let mgr: IAudioSessionManager2 = device.Activate(CLSCTX_ALL, None)?;
+      let mgr: IAudioSessionManager2 = device.Activate(CLSCTX_ALL as u32, None)?;
 
       // Create notifier for this device
       let session_notifier = SessionNotifier::new(
@@ -345,7 +346,9 @@ pub fn register_audio_device_status_callback(
       }
 
       let session_notifier_impl: IAudioSessionNotification = session_notifier.into();
-      mgr.RegisterSessionNotification(&session_notifier_impl)?;
+      mgr
+        .RegisterSessionNotification(&session_notifier_impl)
+        .ok()?;
 
       session_notifiers.push(session_notifier_impl);
     }
@@ -362,7 +365,7 @@ pub struct MicrophoneListener {
 impl MicrophoneListener {
   pub fn new(callback: ThreadsafeFunction<(bool, String, String, String)>) -> Self {
     unsafe {
-      if CoInitializeEx(None, COINIT_MULTITHREADED).is_err() {
+      if CoInitializeEx(None, COINIT_MULTITHREADED as u32).is_err() {
         // If COM initialization fails, create a listener with empty notifiers
         return Self {
           is_running: Arc::new(AtomicBool::new(false)),
@@ -486,7 +489,7 @@ fn get_process_name(pid: u32) -> Option<String> {
 pub fn list_audio_processes() -> Result<Vec<AudioProcess>> {
   unsafe {
     // Try to initialize COM, but don't fail if it's already initialized
-    let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+    let _ = CoInitializeEx(None, COINIT_MULTITHREADED as u32);
   };
 
   let result = get_all_audio_processes()
@@ -498,7 +501,7 @@ pub fn list_audio_processes() -> Result<Vec<AudioProcess>> {
 pub fn list_audio_devices() -> Result<Vec<AudioDevice>> {
   unsafe {
     // Try to initialize COM, but don't fail if it's already initialized
-    let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+    let _ = CoInitializeEx(None, COINIT_MULTITHREADED as u32);
   };
 
   let result = get_all_audio_devices()
@@ -509,10 +512,11 @@ pub fn list_audio_devices() -> Result<Vec<AudioDevice>> {
 
 fn get_all_audio_processes() -> windows_core::Result<Vec<AudioProcess>> {
   unsafe {
-    let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
+    let enumerator: IMMDeviceEnumerator =
+      CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL as u32)?;
 
     let device_collection: IMMDeviceCollection =
-      enumerator.EnumAudioEndpoints(eCapture, DEVICE_STATE_ACTIVE)?;
+      enumerator.EnumAudioEndpoints(eCapture, DEVICE_STATE_ACTIVE as u32)?;
 
     let device_count = device_collection.GetCount()?;
     let mut all_processes = Vec::new();
@@ -525,7 +529,7 @@ fn get_all_audio_processes() -> windows_core::Result<Vec<AudioProcess>> {
       let device_id = device_id_pwstr.to_string()?;
       let device_name = format!("Audio Device {}", i);
 
-      let mgr: IAudioSessionManager2 = device.Activate(CLSCTX_ALL, None)?;
+      let mgr: IAudioSessionManager2 = device.Activate(CLSCTX_ALL as u32, None)?;
       let list: IAudioSessionEnumerator = mgr.GetSessionEnumerator()?;
       let sessions = list.GetCount()?;
 
@@ -567,10 +571,11 @@ fn get_all_audio_processes() -> windows_core::Result<Vec<AudioProcess>> {
 
 fn get_all_audio_devices() -> windows_core::Result<Vec<AudioDevice>> {
   unsafe {
-    let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
+    let enumerator: IMMDeviceEnumerator =
+      CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL as u32)?;
 
     let device_collection: IMMDeviceCollection =
-      enumerator.EnumAudioEndpoints(eCapture, DEVICE_STATE_ACTIVE)?;
+      enumerator.EnumAudioEndpoints(eCapture, DEVICE_STATE_ACTIVE as u32)?;
 
     let device_count = device_collection.GetCount()?;
     let mut devices = Vec::new();
@@ -597,7 +602,7 @@ fn get_all_audio_devices() -> windows_core::Result<Vec<AudioDevice>> {
       let is_default_communications = default_comm_device_id.as_ref() == Some(&device_id);
       let is_default_console = default_console_device_id.as_ref() == Some(&device_id);
 
-      let mgr: IAudioSessionManager2 = device.Activate(CLSCTX_ALL, None)?;
+      let mgr: IAudioSessionManager2 = device.Activate(CLSCTX_ALL as u32, None)?;
       let (has_active_sessions, _) = get_mgr_audio_session_running_status(&mgr)?;
 
       devices.push(AudioDevice {
@@ -616,7 +621,7 @@ fn get_all_audio_devices() -> windows_core::Result<Vec<AudioDevice>> {
 pub fn get_active_audio_processes() -> Result<Vec<AudioProcess>> {
   unsafe {
     // Try to initialize COM, but don't fail if it's already initialized
-    let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+    let _ = CoInitializeEx(None, COINIT_MULTITHREADED as u32);
   };
 
   let result = get_all_audio_processes()
@@ -630,7 +635,7 @@ pub fn get_active_audio_processes() -> Result<Vec<AudioProcess>> {
 pub fn is_process_actively_using_microphone(pid: u32) -> Result<bool> {
   unsafe {
     // Try to initialize COM, but don't fail if it's already initialized
-    let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+    let _ = CoInitializeEx(None, COINIT_MULTITHREADED as u32);
   };
 
   let result = get_all_audio_processes()
