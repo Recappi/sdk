@@ -16,8 +16,9 @@
     "./playground"
   ],
   "files": [
+    "index.cjs",
     "index.d.cts",
-    "./dist/**/*"
+    "dist"
   ],
   "type": "module",
   "main": "index.cjs",
@@ -25,8 +26,8 @@
   "exports": {
     ".": "./index.cjs",
     "./encode-wav": {
-      "default": "./dist/encode-wav.js",
-      "types": "./dist/encode-wav.d.ts"
+      "types": "./dist/encode-wav.d.ts",
+      "default": "./dist/encode-wav.js"
     }
   },
   "publishConfig": {
@@ -44,8 +45,9 @@
     "format:toml": "taplo format",
     "format:rs": "cargo fmt",
     "lint": "vp lint .",
-    "prepublishOnly": "napi prepublish -t npm",
-    "test": "ava",
+    "prepack": "yarn build:ts",
+    "prepublishOnly": "yarn build:ts && napi prepublish -t npm",
+    "test": "yarn build:ts && ava",
     "preversion": "yarn build:debug && git add .",
     "version": "napi version",
     "prepare": "vp config"
