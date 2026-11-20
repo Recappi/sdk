@@ -242,6 +242,68 @@ jobs:
       - name: List packages
         run: ls -R ./npm
         shell: bash
+      - name: Verify package tarball
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+
+          rm -rf dist
+          npm pack --pack-destination "$tmp"
+
+          tarballs=("$tmp"/*.tgz)
+          if [ "${#tarballs[@]}" -ne 1 ] || [ ! -f "${tarballs[0]}" ]; then
+            echo "Expected exactly one tarball in $tmp" >&2
+            exit 1
+          fi
+
+          pkg_dir="$tmp/consumer/node_modules/@recappi/sdk"
+          mkdir -p "$pkg_dir"
+          tar -xzf "${tarballs[0]}" -C "$pkg_dir" --strip-components=1
+
+          for file in index.cjs index.d.cts dist/encode-wav.js dist/encode-wav.d.ts; do
+            test -f "$pkg_dir/$file"
+          done
+
+          cat <<'EOF' > "$tmp/consumer/package.json"
+          {
+            "type": "module"
+          }
+          EOF
+
+          cat <<'EOF' > "$tmp/consumer/check.mjs"
+          import { createWavBuffer } from '@recappi/sdk/encode-wav'
+
+          if (typeof createWavBuffer !== 'function') {
+            throw new Error('Expected createWavBuffer to be a function')
+          }
+
+          const buffer = createWavBuffer(new Float32Array([0, 0.5, -0.5]), {
+            sampleRate: 44100,
+            numChannels: 1,
+          })
+          if (!(buffer instanceof ArrayBuffer) || buffer.byteLength !== 50) {
+            throw new Error(`Unexpected WAV buffer byteLength: ${buffer.byteLength}`)
+          }
+          EOF
+
+          node "$tmp/consumer/check.mjs"
+
+          cat <<'EOF' > "$tmp/consumer/check.mts"
+          import { createWavBuffer } from '@recappi/sdk/encode-wav'
+
+          const buffer: ArrayBuffer = createWavBuffer(new Float32Array([0, 0.5, -0.5]), {
+            sampleRate: 44100,
+            numChannels: 1,
+          })
+          if (!(buffer instanceof ArrayBuffer) || buffer.byteLength !== 50) {
+            throw new Error(`Unexpected WAV buffer byteLength: ${buffer.byteLength}`)
+          }
+          EOF
+
+          tsc_bin="$(pwd)/node_modules/.bin/tsc"
+          (cd "$tmp/consumer" && "$tsc_bin" --noEmit --strict --module nodenext --moduleResolution nodenext --target esnext check.mts)
       - name: Publish
         run: |
           npm install -g npm@latest
