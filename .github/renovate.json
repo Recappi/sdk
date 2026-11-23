@@ -9,14 +9,11 @@
       "groupName": "napi-rs"
     },
     {
-      "matchPackageNames": ["windows", "windows-core"],
-      "groupName": "windows-rs"
-    },
-    {
-      "description": "windows 0.62 requires windows-core 0.62 for COM implementations; update this bound when upgrading windows.",
       "matchManagers": ["cargo"],
-      "matchPackageNames": ["windows-core"],
-      "allowedVersions": "<0.63"
+      "matchPackageNames": ["windows", "windows-core"],
+      "groupName": "windows-rs",
+      "minimumGroupSize": 2,
+      "separateMajorMinor": false
     },
     {
       "matchPackagePatterns": ["^eslint", "^@typescript-eslint"],

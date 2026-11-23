@@ -50,6 +50,12 @@ jobs:
       - name: Cargo fmt
         run: cargo fmt -- --check
 
+      - name: Check generated Windows audio bindings
+        run: |
+          cargo fmt --manifest-path tools/windows-audio-bindings/Cargo.toml -- --check
+          cargo run --locked --manifest-path tools/windows-audio-bindings/Cargo.toml
+          git diff --exit-code -- src/windows/audio_bindings.rs
+
       - name: Clippy
         run: cargo clippy
   cargo-test:
